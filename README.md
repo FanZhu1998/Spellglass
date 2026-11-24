@@ -44,7 +44,7 @@ The desktop app is Spellglass in one file: no browser, no internet connection, n
 
 Run `npm run models` before packaging: the hand-tracking model goes in only when it is in `public/models` (the packaging step warns when it is not). On Windows the portable `.exe` is about 150 MB and the installer about 117 MB; the portable file packs the app as a zip rather than 7z because it unpacks itself at every start, and that way the mirror opens in about 5 seconds instead of 12.
 
-`.github/workflows/desktop.yml` builds both on `windows-latest` and `macos-latest`, by hand (Actions › Desktop app › Run workflow) or for a pushed tag such as `v0.1.0`: it runs the checks, packages, runs the Electron tests, and only then uploads the files as the run's artifacts (GitHub hands them out zipped). Nothing is published.
+`.github/workflows/desktop.yml` builds both on `windows-latest` and `macos-latest` for every push, of a branch or of a tag such as `v0.1.0`, and by hand (Actions › Desktop app › Run workflow): it runs the checks, packages, runs the Electron tests, and only then uploads the files as the run's artifacts (GitHub hands them out zipped). Nothing is published.
 
 To give the desktop app its QR code and replay links, build it with the web version's address, for example `SPELLGLASS_WEB_URL=https://spellglass.example.com/ npm run desktop:win` (in PowerShell, `$env:SPELLGLASS_WEB_URL = 'https://spellglass.example.com/'` first), or set it as a repository variable for the workflow. It must be an https address; replay links made in the desktop app then open there.
 

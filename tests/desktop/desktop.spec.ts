@@ -14,7 +14,8 @@ import {
   releaseApp, removeTempDirs, spellglassWindows, start, tempDir, testBuildApp,
 } from './app';
 
-test.describe.configure({ mode: 'serial' });
+// Each test starts an app of its own, with a user data folder of its own: one that fails does not stop
+// the rest, so a run reports everything that fails on its system at once.
 test.afterAll(removeTempDirs);
 
 const LUMOS: [number, number][] = [[0.5, 0.62], [0.5, 0.3]];

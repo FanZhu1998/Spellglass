@@ -11,6 +11,8 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   fullyParallel: false,
   workers: 1,
-  reporter: [['list']],
+  // In CI the github reporter also turns each failure into an annotation on the run, readable on the
+  // run's page (and through the API) without downloading its log.
+  reporter: process.env.CI ? [['list'], ['github']] : [['list']],
   outputDir: '.output/results',
 });

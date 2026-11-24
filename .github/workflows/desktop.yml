@@ -8,7 +8,10 @@ name: Desktop app
 
 on:
   workflow_dispatch:
+  # Every pushed branch, so a change that breaks the desktop app on either system shows before it is
+  # merged, and every v* tag, which makes the files to hand out.
   push:
+    branches: ['**']
     tags: ['v*']
 
 permissions:

@@ -1,11 +1,18 @@
 // Messages between the hand tracker (main thread) and its worker (Section 5, "Threads": the hand model,
 // when used, gets its own worker).
 //
-// Time is never stamped in the worker (contracts/v1.ts TipSample): each frame carries the capture time and
-// counter from 'camera.frame', and its result carries them back unchanged. `run` changes on every start()
-// of the tracker, so a late message from an earlier run is recognized and dropped.
+// Time is never stamped in the worker (contracts/v1.ts TipSample): each frame carries its capture time on
+// the kernel clock and a frame counter, from 'camera.frame' or from the camera track's feed
+// (kernel/frame-feed.ts), and its result carries them back unchanged. `run` changes on every start() of
+// the tracker, so a late message from an earlier run is recognized and dropped. `seq` numbers the frames
+// the tracker sends, and the answer to each ('result' or 'error') carries it back, so the tracker can
+// tell the answer to the frame it is waiting for from a late answer to one it has given up on.
 
 export type Delegate = 'GPU' | 'CPU';
+
+/** A camera frame as the worker gets it: the camera track's own VideoFrame (the fast path), or an
+ *  ImageBitmap copy of the capture module's video. MediaPipe takes either. */
+export type FrameImage = VideoFrame | ImageBitmap;
 
 /** Why loading failed. 'missing': a file is not where npm run models puts it (or is not what it should
  *  be); 'unreachable': the download itself failed; 'runtime': the files are fine but the model would not
@@ -25,15 +32,21 @@ export type ToWorker =
   | {
       type: 'frame';
       run: number;
+      /** The tracker's number for this frame, different for every frame it sends; the answer carries it
+       *  back. */
+      seq: number;
       generation: number;
-      /** CameraFrame.t and CameraFrame.frame, carried through untouched. */
+      /** Capture time and frame counter (CameraFrame.t and .frame, or the feed's t and index), carried
+       *  through untouched. */
       t: number;
       frame: number;
-      /** Size of the camera frame (the bitmap is a scaled copy). */
+      /** Size of the camera frame, whose aspect the landmarks need (an ImageBitmap is a scaled copy of the
+       *  same aspect; a VideoFrame is the frame itself). */
       width: number;
       height: number;
-      /** Transferred; the worker closes it. About 640 px wide (Section 7.3 notes). */
-      bitmap: ImageBitmap;
+      /** Transferred; the worker closes it, whatever happens. A VideoFrame comes whole, at the camera's
+       *  size; an ImageBitmap about 640 px wide (Section 7.3 notes). */
+      image: FrameImage;
       /** Make a small mirrored preview for 'tracker.debug'. */
       preview: boolean;
       /** Mirror the preview into caster orientation (setting 'capture.flipX'). */
@@ -61,15 +74,18 @@ export type FromWorker =
   | {
       type: 'result';
       run: number;
+      /** The frame's seq, as it came. */
+      seq: number;
       generation: number;
       t: number;
       frame: number;
       width: number;
       height: number;
       hand: HandWire | null;
-      /** Worker time for this frame (detectForVideo), ms. Not a timestamp. */
+      /** Worker time for this frame (detectForVideo), ms. Not a timestamp. The tracker also judges a GPU
+       *  delegate by it (index.ts, a slow GPU). */
       stepMs: number;
       /** Mirrored preview for 'tracker.debug', transferred. */
       preview?: ImageBitmap;
     }
-  | { type: 'error'; run: number; generation: number; message: string };
+  | { type: 'error'; run: number; seq: number; generation: number; message: string };

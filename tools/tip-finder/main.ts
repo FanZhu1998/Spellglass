@@ -3,9 +3,9 @@
 // can measure what the camera sees before anything else is built around it.
 //
 // It uses the app's own pieces directly, without the kernel or the module: the bright-tip worker and its
-// frame source (feed.ts: frames straight from the camera track where Chromium allows it, else from the
-// video), so the numbers it shows are what the app will get, read path and step time included; and the
-// capture module's pure helpers for constraints and exposure.
+// frame source (the kernel's frame-feed.ts: frames straight from the camera track where Chromium allows
+// it, else from the video), so the numbers it shows are what the app will get, read path and step time
+// included; and the capture module's pure helpers for constraints and exposure.
 //
 // Settings are shared with the app on purpose (localStorage 'spellglass.settings', through the kernel's
 // SettingsStore): Appendix A says the numbers found here "become the starting values in Section 7.2".
@@ -21,6 +21,7 @@ import './style.css';
 
 import type { CameraExposureInfo, SettingKey, SettingsMap } from '../../src/contracts';
 import { DEFAULT_SETTINGS } from '../../src/contracts';
+import { browserProcessor, startFeed, type Feed } from '../../src/kernel/frame-feed';
 import { newId } from '../../src/kernel/ids';
 import { SettingsStore, localStoragePersistence } from '../../src/kernel/settings';
 import {
@@ -28,7 +29,6 @@ import {
   videoConstraints, type CameraConstraints, type ExposureTarget, type TrackCapabilities, type TrackSettings,
 } from '../../src/modules/capture/camera-utils';
 import { INFRARED_DEFAULTS, type Channel, type DebugBlob, type TipConfig } from '../../src/modules/trackers/bright-tip/algorithm';
-import { browserProcessor, startFeed, type Feed } from '../../src/modules/trackers/bright-tip/feed';
 import type { FromWorker, ToWorker, WireResult } from '../../src/modules/trackers/bright-tip/protocol';
 import { SessionRecorder, formatExposure, sliderToTime, timeToSlider, type RecordedTip } from './recorder';
 
@@ -423,7 +423,7 @@ async function waitIdle(): Promise<void> {
   }
 }
 
-/** Frames straight from the camera track where Chromium offers MediaStreamTrackProcessor (feed.ts). */
+/** Frames straight from the camera track where Chromium offers MediaStreamTrackProcessor (kernel/frame-feed.ts). */
 function startTrackFeed(): void {
   stopTrackFeed();
   const open = browserProcessor();

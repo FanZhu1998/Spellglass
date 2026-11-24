@@ -1,7 +1,7 @@
 // Synthetic tip streams for the stroke module's tests: a 30 fps camera (or a pointer) driving the
 // pure Segmenter, with the outputs collected in order. Not used by the app.
 
-import type { SegmenterState, SegmenterStatus, Stroke, TipSample } from '../../contracts';
+import type { SegmentationNeeds, SegmenterState, SegmenterStatus, Stroke, TipSample } from '../../contracts';
 import type { SegmenterOutput, SegmenterSettings } from './segmenter';
 import { DEFAULT_SEGMENTER_SETTINGS, Segmenter } from './segmenter';
 
@@ -37,6 +37,8 @@ export interface FeedOptions {
   /** Publish tracker.status first with this pen flag (default false); null publishes none. */
   pen?: boolean | null;
   aspect?: number;
+  /** The tracker's segmentation needs, sent with its tracker.status (contracts 1.2). */
+  segmentation?: SegmentationNeeds;
   /** Start time on the kernel clock. */
   t0?: number;
   /** Arrival lag: kernel time = capture time + latency. */
@@ -52,6 +54,7 @@ export class Feed {
   readonly fps: number;
   readonly src: string;
   readonly aspect: number;
+  readonly segmentation: SegmentationNeeds | undefined;
   readonly latencyMs: number;
   /** Kernel time of the last tick. */
   private lastTick: number;
@@ -61,6 +64,7 @@ export class Feed {
     this.fps = options.fps ?? 30;
     this.src = options.src ?? CAMERA;
     this.aspect = options.aspect ?? ASPECT;
+    this.segmentation = options.segmentation;
     this.latencyMs = options.latencyMs ?? 0;
     this.t = options.t0 ?? 1000;
     this.lastTick = this.t;
@@ -82,8 +86,10 @@ export class Feed {
     return this.t + this.latencyMs;
   }
 
-  status(pen: boolean, aspect = this.aspect, tracker = this.src): this {
-    this.out.push(...this.seg.status({ tracker, state: 'tracking', lock: 1, fps: this.fps, aspect, pen }, this.now));
+  /** A tracker.status. The feed's own tracker sends its segmentation needs unless given others, or
+   *  null for none. */
+  status(pen: boolean, aspect = this.aspect, tracker = this.src, segmentation: SegmentationNeeds | null = tracker === this.src ? (this.segmentation ?? null) : null): this {
+    this.out.push(...this.seg.status({ tracker, state: 'tracking', lock: 1, fps: this.fps, aspect, pen, ...(segmentation ? { segmentation } : {}) }, this.now));
     return this;
   }
 

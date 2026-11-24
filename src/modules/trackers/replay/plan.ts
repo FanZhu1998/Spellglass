@@ -11,7 +11,7 @@
 // held are dropped, and a session that ends with the tip held ends with a tip.lost. The recorder and the
 // fixtures never need these repairs, so recorded behavior replays unchanged (Section 9.1 rule 8).
 
-import type { RecordedSession, SessionEvent } from '../../../contracts';
+import type { RecordedSession, SegmentationNeeds, SessionEvent } from '../../../contracts';
 import { SESSION_SCHEMA } from '../../../contracts';
 
 export const DEFAULT_ASPECT = 16 / 9;
@@ -41,6 +41,8 @@ export interface PlanStep {
 export interface ReplayPlan {
   aspect: number;
   pen: boolean;
+  /** The recorded tracker's segmentation needs (RecordedSession.segmentation), null when it had none. */
+  segmentation: SegmentationNeeds | null;
   steps: PlanStep[];
   /** Events taken from the session (steps that are not synthetic). */
   count: number;
@@ -87,6 +89,19 @@ export function readEvent(raw: unknown): SessionEvent | null {
     default:
       return null;
   }
+}
+
+/** A session's segmentation needs (contracts 1.2), read leniently: the values that are finite numbers of
+ *  zero or more, the others left out, as the segmenter reads them (it holds long times to 2 s itself).
+ *  Null when there are none. */
+export function readNeeds(raw: unknown): SegmentationNeeds | null {
+  if (!isObj(raw)) return null;
+  const out: SegmentationNeeds = {};
+  for (const key of ['lostMs', 'minSamples', 'pauseMs'] as const) {
+    const v = raw[key];
+    if (num(v) && v >= 0) out[key] = v;
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 /** Build the playback plan for a session. Throws ReplayInputError with a plain sentence when the input
@@ -161,6 +176,7 @@ export function planSession(input: unknown): ReplayPlan {
   return {
     aspect,
     pen,
+    segmentation: readNeeds(input.segmentation),
     steps,
     count,
     skipped,

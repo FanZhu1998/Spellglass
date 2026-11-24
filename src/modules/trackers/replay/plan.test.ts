@@ -30,6 +30,17 @@ describe('planSession', () => {
     expect(planSession({ events: [] }).aspect).toBe(DEFAULT_ASPECT);
   });
 
+  it("takes the tracker's segmentation needs from the session, leaving out values that are no use", () => {
+    expect(planSession(session([], { segmentation: { lostMs: 500, minSamples: 5, pauseMs: 300 } })).segmentation).toEqual({ lostMs: 500, minSamples: 5, pauseMs: 300 });
+    expect(planSession(session([], { segmentation: { lostMs: -1, pauseMs: 'long', minSamples: 4 } as never })).segmentation).toEqual({ minSamples: 4 });
+    // None, or nothing usable: the settings apply, as for every session recorded before contracts 1.2.
+    expect(planSession(session([])).segmentation).toBeNull();
+    expect(planSession(session([], { segmentation: { lostMs: Number.NaN } })).segmentation).toBeNull();
+    expect(planSession(session([], { segmentation: 500 as never })).segmentation).toBeNull();
+    const fixture = JSON.parse(readFileSync(FIXTURE, 'utf8')) as RecordedSession;
+    expect(planSession(fixture).segmentation).toBeNull();
+  });
+
   it('skips unknown and malformed events (readers are tolerant)', () => {
     const plan = planSession(session([
       { type: 'tip.found', t: 0, x: 0.5, y: 0.5, conf: 1 },

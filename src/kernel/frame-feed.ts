@@ -1,16 +1,20 @@
-// The fast way to get camera frames to the worker in Chromium (Section 7.1: "MediaStreamTrackProcessor
-// can hand frames to a worker more directly ... so it is an optional fast path"; Section 5 lists it as
-// the capture swap-in).
+// The fast way to get camera frames to a tracker's worker in Chromium (Section 7.1:
+// "MediaStreamTrackProcessor can hand frames to a worker more directly ... so it is an optional fast
+// path"; Section 5 lists it as the capture swap-in). Both camera trackers read the camera track through
+// it, the bright tip and the hand; it lives in the kernel because modules never import each other. Each
+// tracker's header has what the fast path measured for it.
 //
-// Why it matters, measured on the reference laptop (Ryzen 5 5500U, Chrome 158, Chrome's fake camera
-// playing a 1920x1080 clip): a VideoFrame made from the capture module's <video> is NV12 in GPU memory
-// (Chromium uploads camera frames for the compositor), and reading any part of it forces a GPU readback:
-// 6.5 ms for a 252x252 window, 11.8 ms for the whole frame (canvas drawImage plus getImageData: 12 and
-// 18 ms). Frames from a MediaStreamTrackProcessor on the same track come straight from the capture
-// pipeline, I420 in shared memory: 0.2 ms for the window, 1.2 ms for the whole frame. So the bright tip
-// reads the camera track itself where it can, and falls back to 'camera.frame' and new VideoFrame(video)
-// elsewhere. (A camera whose driver hands Chromium GPU frames would make this path slower too; it is
-// never slower than the fallback, which always reads from GPU memory.)
+// Why it matters, measured for the bright tip on the reference laptop (Ryzen 5 5500U, Chrome 158,
+// Chrome's fake camera playing a 1920x1080 clip): a VideoFrame made from the capture module's <video> is
+// NV12 in GPU memory (Chromium uploads camera frames for the compositor), and reading any part of it
+// forces a GPU readback: 6.5 ms for a 252x252 window, 11.8 ms for the whole frame (canvas drawImage plus
+// getImageData: 12 and 18 ms). Frames from a MediaStreamTrackProcessor on the same track come straight
+// from the capture pipeline, I420 in shared memory: 0.2 ms for the window, 1.2 ms for the whole frame.
+// They also arrive sooner: the processor hands a frame over a fraction of a millisecond after capture,
+// where the video's frame callback ('camera.frame') runs several milliseconds later. So the trackers read
+// the camera track themselves where they can, and fall back to 'camera.frame' elsewhere. (A camera whose
+// driver hands Chromium GPU frames would make this path slower too; it is never slower than the
+// fallback, which always reads from GPU memory.)
 //
 // Chrome 158 exposes MediaStreamTrackProcessor on the main thread but not in workers, and a
 // MediaStreamTrack cannot be transferred to a worker (both checked), so the processor runs on the main
@@ -76,6 +80,7 @@ export interface Feed {
  * Read frames from a processor and hand each to `deliver`, but only while the worker is idle: with a
  * one-frame buffer the processor keeps just the newest frame while we wait, so the worker always gets
  * the freshest frame and nothing queues (Section 5). `deliver` owns the frame (transfer or close it).
+ * `waitIdle` must also resolve once the feed has been cancelled, so that the feed can end.
  */
 export function startFeed(o: {
   readable: ReadableStream<VideoFrame>;

@@ -18,15 +18,17 @@
 //    label), spellId is that spell: ground truth for the confusion matrix (Section 13). Without a label,
 //    spellId is what was decided. Voice-only casts, which have no stroke, are recorded at the
 //    incantation's capture time. Replayed casts never count.
-//  - The tracker, its aspect and pen flag (from tracker.status), the camera (from camera.status, for
-//    camera trackers), the non-default settings that shape the pipeline, and the enabled spells.
+//  - The tracker, its aspect, pen flag and segmentation needs (from tracker.status; the needs since
+//    contracts 1.2, so that a replay segments the samples as they were segmented live), the camera (from
+//    camera.status, for camera trackers), the non-default settings that shape the pipeline, and the
+//    enabled spells.
 // A recording is one tracker in one shape: when another tracker takes over, or the recorded tracker
-// stops or changes aspect or pen mode, status() says the recording must stop.
+// stops or changes aspect, pen mode or segmentation needs, status() says the recording must stop.
 
 import type {
-  FizzleReason, Incantation, RecordedSession, SessionEvent, SessionExpectation, Stroke, TipSample, TrackerStatus,
+  FizzleReason, Incantation, RecordedSession, SegmentationNeeds, SessionEvent, SessionExpectation, Stroke, TipSample, TrackerStatus,
 } from '../../contracts';
-import { SESSION_SCHEMA } from '../../contracts';
+import { SEGMENTATION_NEED_MAX_MS, SESSION_SCHEMA } from '../../contracts';
 
 export const REPLAY_TRACKER = 'tracker.replay';
 
@@ -36,6 +38,8 @@ const POS_MAX = 2;
 const MAX_TEXT = 500;
 const MAX_ID = 128;
 const MAX_SPELL_ID = 64;
+/** ... and SegmentationNeeds.minSamples up to this. */
+const MAX_MIN_SAMPLES = 1000;
 
 /** Aspects closer than this are the same shape (rounding in different trackers). */
 const ASPECT_TOLERANCE = 0.01;
@@ -78,6 +82,8 @@ export class SessionRecorder {
   private aspect = 16 / 9;
   private aspectKnown = false;
   private pen = false;
+  /** The recorded tracker's segmentation needs, as the segmenter reads them; null for none. */
+  private segmentation: SegmentationNeeds | null = null;
   private camera?: RecordedSession['camera'];
   private settings: Record<string, unknown> = {};
   private readonly enabledSpells?: string[];
@@ -158,6 +164,8 @@ export class SessionRecorder {
       return null;
     }
     if (Math.abs(s.aspect - this.aspect) > ASPECT_TOLERANCE || !!s.pen !== this.pen) return 'shape-changed';
+    // A replay applies one set of needs to the whole session: new ones are a new shape.
+    if (!sameNeeds(needsOf(s.segmentation), this.segmentation)) return 'shape-changed';
     return null;
   }
 
@@ -261,6 +269,8 @@ export class SessionRecorder {
       tracker: (this.tracker ?? fallbackTracker).slice(0, 64) || 'unknown',
       aspect: this.aspect > 0 && this.aspect <= 10 ? this.aspect : 16 / 9,
       pen: this.pen,
+      // Only when the tracker asked for something: a session without needs replays as before.
+      ...(this.segmentation ? { segmentation: { ...this.segmentation } } : {}),
       events,
       expected,
     };
@@ -280,6 +290,7 @@ export class SessionRecorder {
       this.aspectKnown = true;
     }
     this.pen = !!s.pen;
+    this.segmentation = needsOf(s.segmentation);
   }
 
   /** Tip events count from the recorded tracker only, never from a replay, never from before t0. */
@@ -290,6 +301,25 @@ export class SessionRecorder {
     if (this.tracker === null) this.tracker = src;
     return src === this.tracker;
   }
+}
+
+/** A tracker's segmentation needs as the segmenter reads them (contracts/events.ts SegmentationNeeds):
+ *  only finite numbers of zero or more count, lostMs and pauseMs held to SEGMENTATION_NEED_MAX_MS, and
+ *  minSamples to the schema's bound (a need that large asks for nothing the settings do not already
+ *  give). Null when none is usable. */
+function needsOf(n: unknown): SegmentationNeeds | null {
+  if (!n || typeof n !== 'object') return null;
+  const v = n as Record<string, unknown>;
+  const ok = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x) && x >= 0;
+  const out: SegmentationNeeds = {};
+  if (ok(v.lostMs)) out.lostMs = Math.min(v.lostMs, SEGMENTATION_NEED_MAX_MS);
+  if (ok(v.minSamples)) out.minSamples = Math.min(v.minSamples, MAX_MIN_SAMPLES);
+  if (ok(v.pauseMs)) out.pauseMs = Math.min(v.pauseMs, SEGMENTATION_NEED_MAX_MS);
+  return Object.keys(out).length ? out : null;
+}
+
+function sameNeeds(a: SegmentationNeeds | null, b: SegmentationNeeds | null): boolean {
+  return a?.lostMs === b?.lostMs && a?.minSamples === b?.minSamples && a?.pauseMs === b?.pauseMs;
 }
 
 function rel(t: number, t0: number): number {

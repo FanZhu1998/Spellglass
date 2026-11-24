@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CAMERA, Feed, Noise, POINTER } from './test-support';
-import { AT_REST_SHARE, DEFAULT_SEGMENTER_SETTINGS, PENDING_MARGIN_MS, PROGRESS_INTERVAL_MS } from './segmenter';
+import { AT_REST_SHARE, DEFAULT_SEGMENTER_SETTINGS, MAX_NEED_MS, PENDING_MARGIN_MS, PROGRESS_INTERVAL_MS } from './segmenter';
 
 const S = DEFAULT_SEGMENTER_SETTINGS;
 /** A right-then-up hook: 0.2 frame widths right, then 0.2 frame heights up. */
@@ -336,6 +336,137 @@ describe('hold-still: losing the tip (Section 7.9)', () => {
     const f = new Feed();
     f.found(0.5, 0.5).hold(0.5, 0.5, 400).found(0.2, 0.2);
     expect(f.states().slice(-3)).toEqual(['armed', 'searching', 'hovering']);
+  });
+});
+
+describe("a tracker's segmentation needs (contracts 1.2)", () => {
+  const HAND = 'tracker.hand';
+  /** What the hand tracker asks for. */
+  const NEEDS = { lostMs: 500, minSamples: 5, pauseMs: 300 };
+  const hand = (options: ConstructorParameters<typeof Feed>[0] = {}) => new Feed({ src: HAND, segmentation: NEEDS, ...options });
+
+  it("bridges a gap in that tracker's samples up to its lostMs; the settings' 200 ms still apply to others", () => {
+    for (const [f, kept] of [[hand(), true], [new Feed(), false]] as const) {
+      f.found(0.3, 0.5).hold(0.3, 0.5, 400).move([0.3, 0.5], [0.45, 0.5], 300);
+      // 400 ms without samples (the hand tracker keeps the tip for that long), then the hand again.
+      f.wait(400).move([0.45, 0.5], [0.6, 0.5], 300).hold(0.6, 0.5, 400);
+      const strokes = f.strokes();
+      if (kept) {
+        expect(strokes).toHaveLength(1);
+        expect(strokes[0]).toMatchObject({ src: HAND, endReason: 'pause' });
+        expect(strokes[0].points.at(-1)!.x).toBeCloseTo(0.6, 6);
+      } else {
+        // The camera's stroke ended in the gap, 200 ms after its last sample.
+        expect(strokes[0]).toMatchObject({ src: CAMERA, endReason: 'lost' });
+      }
+    }
+  });
+
+  it("ends a stroke lostMs after that tracker's last sample, on a tick or on the next sample", () => {
+    const f = hand();
+    f.found(0.3, 0.5).hold(0.3, 0.5, 400).move([0.3, 0.5], [0.6, 0.5], 500);
+    const lastT = f.t - f.frameMs;
+    f.wait(NEEDS.lostMs - 50);
+    expect(f.seg.state).toBe('tracing');
+    f.wait(100);
+    expect(f.seg.state).toBe('evaluating');
+    expect(f.statuses().find((s) => s.state === 'evaluating')!.t).toBeCloseTo(lastT + NEEDS.lostMs, 0);
+    expect(f.lastStroke()).toMatchObject({ endReason: 'lost' });
+    // A gap seen only when the next sample arrives (no ticks in between).
+    const g = hand();
+    g.found(0.3, 0.5).hold(0.3, 0.5, 400).move([0.3, 0.5], [0.6, 0.5], 500);
+    g.t += 450;
+    g.out.push(...g.seg.sample({ t: g.t, x: 0.65, y: 0.5, conf: 1, src: HAND }, g.t));
+    expect(g.seg.state).toBe('tracing');
+    g.t += 550;
+    g.out.push(...g.seg.sample({ t: g.t, x: 0.7, y: 0.5, conf: 1, src: HAND }, g.t));
+    expect(g.lastStroke()).toMatchObject({ endReason: 'lost' });
+  });
+
+  it('keeps a stroke of minSamples samples that the settings would call too short', () => {
+    // A quick flick: the lead-in sample and five moving ones.
+    for (const [f, kept] of [[hand(), true], [new Feed(), false]] as const) {
+      f.found(0.3, 0.5).hold(0.3, 0.5, 400).move([0.3, 0.5], [0.6, 0.5], 150).hold(0.6, 0.5, 400);
+      expect(f.strokes('stroke.begin')).toHaveLength(1);
+      if (kept) expect(f.lastStroke()!.points).toHaveLength(6);
+      else expect(f.statuses().find((s) => s.discarded)).toMatchObject({ discarded: 'too-short' });
+    }
+  });
+
+  it('counts a tracker that asks for fewer than 3 samples as asking for 3', () => {
+    // One frame from the armed position to the end: the stroke is two samples.
+    for (const [minSamples, settings, kept] of [[1, {}, false], [2, {}, false], [1, { minSamples: 2 }, true]] as const) {
+      const f = hand({ segmentation: { minSamples }, settings });
+      f.found(0.3, 0.5).hold(0.3, 0.5, 400).move([0.3, 0.5], [0.6, 0.5], 33).hold(0.6, 0.5, 400);
+      // A player's own setting under 3 is theirs to make.
+      if (kept) expect(f.lastStroke()!.points, `minSamples ${minSamples}`).toHaveLength(2);
+      else expect(f.statuses().find((s) => s.discarded), `minSamples ${minSamples}`).toMatchObject({ discarded: 'too-short' });
+    }
+  });
+
+  it("lets a corner last longer than the settings' pause, up to the tracker's", () => {
+    // A stop of about 267 ms at a corner: longer than the settings' 250 ms, shorter than the hand's 300.
+    for (const [f, strokes] of [[hand(), 1], [new Feed(), 2]] as const) {
+      f.found(0.3, 0.5).hold(0.3, 0.5, 400).move([0.3, 0.5], [0.5, 0.5], 300).hold(0.5, 0.5, 260);
+      if (strokes === 2) f.decide('fizzle').hold(0.5, 0.5, 400);
+      f.move([0.5, 0.5], [0.5, 0.25], 300).hold(0.5, 0.25, 450);
+      const first = f.strokes()[0];
+      expect(first.endReason).toBe('pause');
+      if (strokes === 1) {
+        expect(f.strokes()).toHaveLength(1);
+        expect(first.points.at(-1)).toMatchObject({ x: 0.5, y: 0.25 });
+        // Decided the tracker's pauseMs after the tip came to rest.
+        const evaluating = f.statuses().find((s) => s.state === 'evaluating')!;
+        expect(evaluating.t - first.t1).toBeGreaterThanOrEqual(NEEDS.pauseMs);
+        expect(evaluating.t - first.t1).toBeLessThan(NEEDS.pauseMs + 40);
+      } else {
+        // The camera's stroke ended at the corner.
+        expect(first.points.at(-1)).toMatchObject({ x: 0.5, y: 0.5 });
+      }
+    }
+  });
+
+  it('lets a setting that is more forgiving win', () => {
+    const settings = { lostMs: 800, minSamples: 4, pauseMs: 400 };
+    // lostMs 800: a 700 ms gap is bridged.
+    const f = hand({ settings });
+    f.found(0.3, 0.5).hold(0.3, 0.5, 400).move([0.3, 0.5], [0.45, 0.5], 300).wait(700).move([0.45, 0.5], [0.6, 0.5], 300).hold(0.6, 0.5, 600);
+    expect(f.strokes()).toHaveLength(1);
+    // pauseMs 400: a 330 ms stop at a corner goes on.
+    const g = hand({ settings });
+    g.found(0.3, 0.5).hold(0.3, 0.5, 400).move([0.3, 0.5], [0.5, 0.5], 300).hold(0.5, 0.5, 330).move([0.5, 0.5], [0.5, 0.25], 300).hold(0.5, 0.25, 600);
+    expect(g.strokes()).toHaveLength(1);
+    expect(g.lastStroke()!.points.at(-1)).toMatchObject({ x: 0.5, y: 0.25 });
+    // minSamples 4: a stroke of 4 samples is kept.
+    const k = hand({ settings });
+    k.found(0.3, 0.5).hold(0.3, 0.5, 400).move([0.3, 0.5], [0.6, 0.5], 100).hold(0.6, 0.5, 600);
+    expect(k.lastStroke()!.points).toHaveLength(4);
+  });
+
+  it("keeps the needs per tracker: another tracker's samples, and a status without needs, use the settings", () => {
+    // The hand tracker's needs do not reach the bright tip's samples.
+    const f = new Feed();
+    f.status(false, 16 / 9, HAND, NEEDS);
+    f.found(0.3, 0.5).hold(0.3, 0.5, 400).move([0.3, 0.5], [0.45, 0.5], 300).wait(300);
+    expect(f.lastStroke()).toMatchObject({ src: CAMERA, endReason: 'lost' });
+    // A later status without needs means the tracker needs nothing any more.
+    const g = hand();
+    g.status(false, 16 / 9, HAND, null);
+    g.found(0.3, 0.5).hold(0.3, 0.5, 400).move([0.3, 0.5], [0.45, 0.5], 300).wait(300);
+    expect(g.lastStroke()).toMatchObject({ src: HAND, endReason: 'lost' });
+  });
+
+  it('ignores needs that make no sense, and holds long ones to MAX_NEED_MS', () => {
+    const odd = { lostMs: -5, pauseMs: Number.NaN, minSamples: 'four' } as unknown as typeof NEEDS;
+    const f = hand({ segmentation: odd });
+    f.found(0.3, 0.5).hold(0.3, 0.5, 400).move([0.3, 0.5], [0.45, 0.5], 300).wait(300);
+    expect(f.lastStroke()).toMatchObject({ endReason: 'lost' });
+    const g = hand({ segmentation: { lostMs: 60_000 } });
+    g.found(0.3, 0.5).hold(0.3, 0.5, 400).move([0.3, 0.5], [0.6, 0.5], 500);
+    const lastT = g.t - g.frameMs;
+    g.wait(MAX_NEED_MS + 100);
+    expect(g.seg.state).toBe('evaluating');
+    expect(g.statuses().find((s) => s.state === 'evaluating')!.t).toBeCloseTo(lastT + MAX_NEED_MS, 0);
   });
 });
 

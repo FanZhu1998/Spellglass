@@ -3,10 +3,10 @@
 //
 // The main thread only moves frames to the worker, which reads the pixels and runs algorithm.ts. Frames
 // come from one of two sources, through one send path:
-//  - The fast path (feed.ts): where Chromium offers MediaStreamTrackProcessor, frames come straight from
-//    the camera track in CameraReady.stream. They are far cheaper to read (feed.ts has the numbers: at
-//    1080p a whole frame costs 1.2 ms instead of 11.8 ms), which is what keeps the tracker inside the
-//    4 ms budget of Section 13.
+//  - The fast path (kernel/frame-feed.ts, shared with the hand tracker): where Chromium offers
+//    MediaStreamTrackProcessor, frames come straight from the camera track in CameraReady.stream. They
+//    are far cheaper to read (frame-feed.ts has the numbers: at 1080p a whole frame costs 1.2 ms instead
+//    of 11.8 ms), which is what keeps the tracker inside the 4 ms budget of Section 13.
 //  - Otherwise, on each 'camera.frame' the capture module's video is wrapped in a VideoFrame (or an
 //    ImageBitmap where VideoFrame is missing). This also takes over if the fast path stops delivering.
 // One frame is in flight at a time; a frame that arrives while the worker is busy is dropped rather than
@@ -24,10 +24,11 @@
 import type {
   AutotuneResult, CameraExposureInfo, CameraFrame, CameraReady, Kernel, Module, ModuleManifest, TipSample, TrackerStatus,
 } from '../../../contracts';
-import { ask, describeError, emit, lastPayload, logger, on, serve, setSetting, setting } from '../../../kernel';
+import {
+  ask, browserProcessor, describeError, emit, lastPayload, logger, on, serve, setSetting, setting, startFeed, type Feed, type ProcessorFactory,
+} from '../../../kernel';
 import { DEFAULT_TIP_CONFIG, INFRARED_DEFAULTS, type TipConfig } from './algorithm';
 import { AutotunePlanner, autotuneMessage, type Exposure, type Measure } from './autotune';
-import { browserProcessor, startFeed, type Feed, type ProcessorFactory } from './feed';
 import type { FromWorker, ToWorker, WireResult } from './protocol';
 
 export const MANIFEST: ModuleManifest = {
@@ -56,8 +57,8 @@ export interface BrightTipDeps {
   createWorker(): WorkerLike;
   /** The current frame of the capture module's video, ready to transfer; null when there is none yet. */
   grabFrame(video: HTMLVideoElement, t: number): VideoFrame | ImageBitmap | Promise<VideoFrame | ImageBitmap> | null;
-  /** MediaStreamTrackProcessor on the camera track, where the browser has it (the fast path, feed.ts).
-   *  Absent or null: frames come from 'camera.frame' only. */
+  /** MediaStreamTrackProcessor on the camera track, where the browser has it (the fast path,
+   *  kernel/frame-feed.ts). Absent or null: frames come from 'camera.frame' only. */
   openProcessor?: ProcessorFactory | null;
 }
 

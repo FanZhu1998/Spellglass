@@ -4,6 +4,7 @@
 // stream of tracker events plus the casts it produced. The diagnostics overlay records them in
 // this format; tests replay them through filter, segmenter, recognizer and engine.
 
+import type { SegmentationNeeds } from './events';
 import type { FizzleReason } from './v1';
 
 export const SESSION_SCHEMA = 'session/1';
@@ -41,6 +42,13 @@ export interface RecordedSession {
   aspect: number;
   /** The segmenter ran in pen mode (mouse or touch) rather than hold-still. */
   pen?: boolean;
+  /** @since 1.2 What the tracker's samples needed from the segmenter: the `segmentation` of its
+   *  tracker.status (contracts/events.ts SegmentationNeeds), as the segmenter reads it (values that are
+   *  not finite numbers of zero or more left out, lostMs and pauseMs held to SEGMENTATION_NEED_MAX_MS).
+   *  Whatever plays the session back publishes it with the session's tracker.status, so the samples are
+   *  segmented as they were live: the hand tracker's, say, keep the 500 ms gaps they were allowed.
+   *  Absent: the tracker needed nothing, and the settings applied. */
+  segmentation?: SegmentationNeeds;
   /** Settings that shape the pipeline, captured at recording time (only non-default ones). Applied
    *  only by test harnesses, never to a player's settings. */
   settings?: Record<string, unknown>;

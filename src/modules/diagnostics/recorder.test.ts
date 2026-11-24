@@ -163,6 +163,31 @@ describe('SessionRecorder', () => {
     expect(recorder().status(status('tracker.bright-tip', { pen: true }))).toBe('shape-changed');
   });
 
+  it("keeps the tracker's segmentation needs as the segmenter reads them, and only when it has some", () => {
+    const needs = { lostMs: 500, minSamples: 5, pauseMs: 300 };
+    const hand = recorder({ status: status('tracker.hand', { segmentation: needs }) });
+    hand.tip('tip.sample', sample(T0 + 5, 0.5, 0.5, 'tracker.hand'), 'tracker.hand');
+    const s = hand.finish('x');
+    expect(s.segmentation).toEqual(needs);
+    expect(checkSession(s)).toEqual({ ok: true });
+    // The same needs in every later status go on; other needs, or none, are a new shape.
+    expect(hand.status(status('tracker.hand', { segmentation: { ...needs } }))).toBeNull();
+    expect(recorder({ status: status('tracker.hand', { segmentation: needs }) }).status(status('tracker.hand', { segmentation: { ...needs, lostMs: 600 } }))).toBe('shape-changed');
+    expect(recorder({ status: status('tracker.hand', { segmentation: needs }) }).status(status('tracker.hand'))).toBe('shape-changed');
+    expect(recorder().status(status('tracker.bright-tip', { segmentation: needs }))).toBe('shape-changed');
+    // Values the segmenter would not use are left out, long times held to 2 s, so the file validates.
+    const odd = recorder({ status: status('tracker.hand', { segmentation: { lostMs: 60_000, pauseMs: -1, minSamples: Number.NaN } }) }).finish('x');
+    expect(odd.segmentation).toEqual({ lostMs: 2000 });
+    expect(checkSession(odd)).toEqual({ ok: true });
+    expect('segmentation' in recorder({ status: status('tracker.hand', { segmentation: { lostMs: 'long' } as never }) }).finish('x')).toBe(false);
+    // A tracker that needs nothing records no needs: such a session replays as sessions always have.
+    expect('segmentation' in recorder().finish('x')).toBe(false);
+    // Adopted from the first status when recording began with none running.
+    const late = recorder({ status: null });
+    expect(late.status(status('tracker.hand', { segmentation: needs }))).toBeNull();
+    expect(late.finish('x').segmentation).toEqual(needs);
+  });
+
   it('adopts the first tracker to report when none was running', () => {
     const rec = recorder({ status: null });
     expect(rec.recordedTracker).toBeNull();

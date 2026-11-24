@@ -5,12 +5,13 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { vi } from 'vitest';
-import type { Module, RecordedSession, SpellCast, SpellFizzle } from '../../src/contracts';
+import type { Module, RecordedSession, SegmentationNeeds, SessionEvent, SpellCast, SpellFizzle } from '../../src/contracts';
 import { EFFECT_CAPABILITY, eventVersion } from '../../src/contracts';
 import { createKernel, memoryPersistence, on, type KernelHost } from '../../src/kernel';
 import { createStrokeModule } from '../../src/modules/stroke';
 import { createTemplateRecognizer } from '../../src/modules/recognizers/template';
 import { createSpellEngine } from '../../src/modules/spell-engine';
+import { SEGMENTATION } from '../../src/modules/trackers/hand/tracking';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 export const PACK_INDEX_URL = 'http://spellglass.test/packs/index.json';
@@ -84,13 +85,18 @@ export async function createPipeline(settings: Record<string, unknown> = {}): Pr
   };
 }
 
-/** Feed a session's events at their recorded times. Requires vi.useFakeTimers() with performance faked. */
+/** Feed a session's events at their recorded times. Requires vi.useFakeTimers() with performance faked.
+ *  The tracker's status carries the session's segmentation needs when it has some (contracts 1.2), as
+ *  the replay tracker's does, so the samples are segmented as they were when recorded. */
 export async function play(p: Pipeline, session: RecordedSession, tailMs = 3000): Promise<void> {
   const { kernel, t0 } = p;
   const src = session.tracker || 'tracker.bright-tip';
   kernel.publish({
     type: 'tracker.status', v: 1, t: t0, source: src,
-    payload: { tracker: src, state: 'tracking', lock: 1, fps: 30, aspect: session.aspect, pen: session.pen ?? false },
+    payload: {
+      tracker: src, state: 'tracking', lock: 1, fps: 30, aspect: session.aspect, pen: session.pen ?? false,
+      ...(session.segmentation ? { segmentation: session.segmentation } : {}),
+    },
   });
   let now = 0;
   for (const e of session.events) {
@@ -117,4 +123,51 @@ export async function play(p: Pipeline, session: RecordedSession, tailMs = 3000)
 
 export function loadSession(path: string): RecordedSession {
   return JSON.parse(readFileSync(path, 'utf8')) as RecordedSession;
+}
+
+/** The hand tracker's segmentation needs, a plain copy as its tracker.status carries them. */
+export const HAND_NEEDS: SegmentationNeeds = { ...SEGMENTATION };
+
+/**
+ * A cast as the hand tracker reports one, at 30 fps, in session events (times from the session's start):
+ * held still to arm, traced right with a 350 ms dropout in the middle (frames without a hand, which the
+ * tracker bridges: it keeps the tip for 400 ms), a stop of about 230 ms at a corner, then down, at rest,
+ * and the hand lost. Segmented with HAND_NEEDS it is one stroke across the dropout, ending in a pause
+ * at (0.65, 0.3); with the settings alone the stroke is cut at the dropout, at (0.5, 0.5).
+ */
+export function handCastEvents(): SessionEvent[] {
+  const dt = 1000 / 30;
+  const r = (v: number, digits: number) => Math.round(v * 10 ** digits) / 10 ** digits;
+  const events: SessionEvent[] = [];
+  let t = 200;
+  const at = (x: number, y: number) => {
+    events.push({ type: 'tip.sample', t: r(t, 1), x: r(x, 5), y: r(y, 5), conf: 0.95, size: 0.1 });
+    t += dt;
+  };
+  const hold = (x: number, y: number, ms: number) => {
+    for (const end = t + ms; t < end - 1e-6; ) at(x, y);
+  };
+  const move = (a: [number, number], b: [number, number], ms: number) => {
+    const n = Math.max(1, Math.round(ms / dt));
+    for (let i = 1; i <= n; i++) at(a[0] + ((b[0] - a[0]) * i) / n, a[1] + ((b[1] - a[1]) * i) / n);
+  };
+  events.push({ type: 'tip.found', t: r(t, 1), x: 0.3, y: 0.5, conf: 0.95 });
+  hold(0.3, 0.5, 400);
+  move([0.3, 0.5], [0.5, 0.5], 300);
+  t += 350;
+  move([0.5, 0.5], [0.65, 0.5], 300);
+  hold(0.65, 0.5, 230);
+  move([0.65, 0.5], [0.65, 0.3], 300);
+  hold(0.65, 0.3, 500);
+  const lastSeen = events[events.length - 1].t;
+  events.push({ type: 'tip.lost', t: r(lastSeen + 400, 1), lastSeen });
+  return events;
+}
+
+/** The longest gap between two samples of a session, in session time (handCastEvents: its dropout). */
+export function longestGap(events: readonly SessionEvent[]): { from: number; to: number } {
+  const times = events.filter((e) => e.type === 'tip.sample').map((e) => e.t);
+  let gap = { from: 0, to: 0 };
+  for (let i = 1; i < times.length; i++) if (times[i] - times[i - 1] > gap.to - gap.from) gap = { from: times[i - 1], to: times[i] };
+  return gap;
 }

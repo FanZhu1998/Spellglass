@@ -5,7 +5,9 @@
 // 'replay.play' {session, speed} (registered in init()):
 //   1. activates this tracker transiently ('modules.activate' with transient: true), so the persisted
 //      'tracker.active' setting is untouched and the player's tracker comes back afterwards;
-//   2. publishes tracker.status with the session's aspect and pen flag (rule 1 of the tip event rules);
+//   2. publishes tracker.status with the session's aspect and pen flag (rule 1 of the tip event rules),
+//      and its segmentation needs when it has some (contracts 1.2 RecordedSession.segmentation), so the
+//      segmenter, and the stage's tip, treat the samples as they treated them live;
 //   3. publishes the session's tip.sample, tip.found, tip.lost and voice.incantation events at their
 //      recorded times re-based onto kernel.now(): published t = start + recorded t, in the envelope and
 //      in the payload. speed changes only when they go out; speed 0 publishes everything at once (tests);
@@ -27,7 +29,8 @@ export const MANIFEST: ModuleManifest = {
   kind: 'tracker',
   title: 'Recorded session',
   version: '1.0.0',
-  contract: '^1.1',
+  // 1.2: tracker.status carries the session's `segmentation`.
+  contract: '^1.2',
   provides: ['tip.source', 'replay@1'],
   requires: [],
   // Not a way to see the wand: the Threshold screen does not offer it (contracts/module.ts).
@@ -78,6 +81,8 @@ export function createReplayTracker(): Module {
       pen,
       hint: null,
       message,
+      // Every status about a session carries its needs (a status without them means none).
+      ...(plan?.segmentation ? { segmentation: { ...plan.segmentation } } : {}),
     });
   }
 

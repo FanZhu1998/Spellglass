@@ -1,7 +1,8 @@
 <script lang="ts">
   // What the mirror says at its top edge (Sections 7.9, 10.4 and 10.5): a camera that needs fixing,
-  // a tracker that stopped, "Wand tip not found", the hand model loading, and until the first
-  // successful cast the coach line "Hold still, trace the spell, then hold still again."
+  // a tracker that stopped, "Wand tip not found" (or a hand too small to follow well), the hand model
+  // loading, and until the first successful cast the coach line "Hold still, trace the spell, then
+  // hold still again."
   // One note at a time, the most pressing first.
   import { fade } from 'svelte/transition';
   import type { AppState } from '../../app-state.svelte';
@@ -43,6 +44,7 @@
       if (t.state === 'error') return { kind: 'tracker-error', tone: 'error', text: trackerLine(t, route)?.text ?? 'The tracker stopped.' };
       if (t.hint === 'tip-not-found') return { kind: 'hint', tone: 'warn', text: TEXT.tipNotFound };
       if (t.hint === 'hand-not-found') return { kind: 'hint', tone: 'warn', text: TEXT.handNotFound };
+      if (t.hint === 'hand-too-small') return { kind: 'hint', tone: 'warn', text: TEXT.handTooSmall };
       if (t.hint === 'too-many-lights') return { kind: 'hint', tone: 'warn', text: TEXT.tooManyLights };
       if (t.state === 'loading' && t.tracker === 'tracker.hand') {
         const line = trackerLine(t, route);

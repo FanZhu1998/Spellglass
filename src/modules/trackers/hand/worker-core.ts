@@ -13,14 +13,19 @@
 //      not as a frozen trail, and a delegate that fails on its first frame fails while loading, where the
 //      CPU retry can still take over.
 // Frames: detectForVideo needs strictly increasing timestamps, so each frame's capture time is rounded to
-// whole milliseconds and nudged past the previous one when two frames share a millisecond.
+// whole milliseconds and nudged past the previous one when two frames share a millisecond. A frame is a
+// VideoFrame from the camera track or an ImageBitmap of the video (protocol.ts FrameImage); MediaPipe
+// 1.2.3 takes both (a VideoFrame sized by its displayWidth, measured in the latency study), and whole
+// 1080p VideoFrames ran on both delegates. Each one is closed as soon as the model is done with it, on
+// every path: an open VideoFrame holds one of the camera's few buffers, and the camera stalls when they
+// run out.
 
 import { AssetError, downloadAll, type AssetRequest } from './assets';
-import type { Delegate, FromWorker, HandWire, ToWorker } from './protocol';
+import type { Delegate, FrameImage, FromWorker, HandWire, ToWorker } from './protocol';
 
 /** What the core needs from a HandLandmarker (a subset of @mediapipe/tasks-vision's). */
 export interface LandmarkerLike {
-  detectForVideo(image: ImageBitmap | ImageData, timestamp: number): {
+  detectForVideo(image: FrameImage | ImageData, timestamp: number): {
     landmarks: { x: number; y: number; z: number; presence?: number }[][];
     handedness: { score: number; categoryName: string }[][];
   };
@@ -38,7 +43,7 @@ export interface WorkerCoreDeps {
   revokeUrl(url: string): void;
   post(msg: FromWorker, transfer?: Transferable[]): void;
   /** A small copy of the frame in caster orientation for 'tracker.debug', or null. */
-  preview?(bitmap: ImageBitmap, flipX: boolean): ImageBitmap | null;
+  preview?(image: FrameImage, flipX: boolean): ImageBitmap | null;
   /** A blank image for the warm-up detection, or null to skip it. */
   warmupImage?(): ImageBitmap | ImageData | null;
   /** performance.now(), for stepMs only. */
@@ -113,31 +118,43 @@ export function createWorkerCore(deps: WorkerCoreDeps): WorkerCore {
   }
 
   function frame(msg: Extract<ToWorker, { type: 'frame' }>): void {
-    const { run, generation, t, frame: n, width, height, bitmap } = msg;
-    if (!landmarker) {
-      bitmap.close();
-      deps.post({ type: 'error', run, generation, message: 'The hand model is not loaded yet.' });
-      return;
-    }
-    // Strictly increasing whole-millisecond timestamps (MediaPipe's graph rejects repeats).
-    const ts = Math.max(Math.round(t), Number.isFinite(lastTs) ? lastTs + 1 : -Infinity);
-    lastTs = ts;
+    // seq goes back with the answer, whichever it is: the tracker frees its one slot only for the frame
+    // it is waiting for (protocol.ts).
+    const { run, seq, generation, t, frame: n, width, height, image } = msg;
     let hand: HandWire | null = null;
     let stepMs = 0;
     let preview: ImageBitmap | null = null;
     try {
-      const began = deps.now();
-      const result = landmarker.detectForVideo(bitmap, ts);
-      stepMs = deps.now() - began;
-      hand = firstHand(result);
-      if (msg.preview && deps.preview) preview = deps.preview(bitmap, msg.flipX);
-    } catch (err) {
-      bitmap.close();
-      deps.post({ type: 'error', run, generation, message: text(err) });
-      return;
+      if (!landmarker) {
+        deps.post({ type: 'error', run, seq, generation, message: 'The hand model is not loaded yet.' });
+        return;
+      }
+      // Strictly increasing whole-millisecond timestamps (MediaPipe's graph rejects repeats).
+      const ts = Math.max(Math.round(t), Number.isFinite(lastTs) ? lastTs + 1 : -Infinity);
+      lastTs = ts;
+      try {
+        const began = deps.now();
+        const result = landmarker.detectForVideo(image, ts);
+        stepMs = deps.now() - began;
+        hand = firstHand(result);
+      } catch (err) {
+        deps.post({ type: 'error', run, seq, generation, message: text(err) });
+        return;
+      }
+      // The preview is only a view for the tuning screen: when it fails, the detection still counts.
+      if (msg.preview && deps.preview) {
+        try {
+          preview = deps.preview(image, msg.flipX);
+        } catch {
+          preview = null;
+        }
+      }
+    } finally {
+      // Every path closes the frame: by now detectForVideo (synchronous) and the preview have read it, or
+      // it never reached them.
+      closeImage(image);
     }
-    bitmap.close();
-    const out: FromWorker = { type: 'result', run, generation, t, frame: n, width, height, hand, stepMs: Math.round(stepMs * 100) / 100 };
+    const out: FromWorker = { type: 'result', run, seq, generation, t, frame: n, width, height, hand, stepMs: Math.round(stepMs * 100) / 100 };
     if (preview) {
       out.preview = preview;
       deps.post(out, [preview]);
@@ -182,6 +199,22 @@ export function firstHand(result: ReturnType<LandmarkerLike['detectForVideo']>):
   const presence = lms[8]?.presence;
   if (typeof presence === 'number' && presence > 0) hand.tipPresence = presence;
   return hand;
+}
+
+/** The size a frame shows at: a VideoFrame's display size (what MediaPipe sizes it by), an ImageBitmap's
+ *  own. */
+export function frameSize(image: FrameImage): { width: number; height: number } {
+  if ('displayWidth' in image) return { width: image.displayWidth, height: image.displayHeight };
+  return { width: image.width, height: image.height };
+}
+
+/** Closing twice, or a frame already given away, is not an error. */
+function closeImage(image: FrameImage): void {
+  try {
+    image.close();
+  } catch {
+    /* already closed */
+  }
 }
 
 function r5(v: number): number {

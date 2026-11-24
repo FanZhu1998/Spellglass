@@ -25,7 +25,8 @@ export const MANIFEST: ModuleManifest = {
   kind: 'diagnostics',
   title: 'Diagnostics',
   version: '1.0.0',
-  contract: '^1.1',
+  // 1.2: a recording keeps the tracker's TrackerStatus.segmentation (RecordedSession.segmentation).
+  contract: '^1.2',
   provides: ['diagnostics@1'],
   requires: [],
 };

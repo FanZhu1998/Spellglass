@@ -9,7 +9,8 @@
 //   armed      → searching   the tip is lost
 //   tracing    → evaluating  a pause (segmenter.pauseMs 0.25 s within segmenter.pauseRadius), the tip
 //                            lost for segmenter.lostMs (0.2 s), or segmenter.maxMs (4 s) in total
-//                            (stroke.end; or a discarded status when the stroke is too short or small)
+//                            (stroke.end; or a discarded status when the stroke is too short or small;
+//                            a tracker can ask for longer pauses and gaps, see below)
 //   evaluating → cooldown    spell.cast for this stroke
 //   evaluating → hovering    spell.fizzle for this stroke, or no decision by segmenter.evaluateTimeoutMs
 //   cooldown   → hovering    after segmenter.cooldownMs (0.4 s)
@@ -34,9 +35,18 @@
 //
 // Distances are isotropic, in frame widths: dx in caster x, dy divided by the aspect of the
 // sample's tracker (contracts/events.ts tip event rules: tracker.status is kept per tracker).
+//
+// A tracker may ask for more forgiving rules for its own samples (tracker.status `segmentation`,
+// @since 1.2, contracts/events.ts SegmentationNeeds): a hand-landmark model misses runs of frames,
+// runs at 15 to 30 fps and slows at corners, and the hand tracker asks for lostMs 0.5 s, minSamples 5
+// and pauseMs 0.3 s. The needs are kept per tracker with its aspect and pen flag, and wherever those
+// three settings are read for a tracker's samples the more forgiving of setting and need applies
+// (lostMsFor, minSamplesFor, pauseMsFor): longer waits, fewer samples (never fewer than 3 on a
+// tracker's word). A setting that is already more forgiving wins, and other trackers' samples keep
+// the settings as they are.
 
-import type { PlayArea, SegmenterState, SegmenterStatus, Stroke, TipSample, TrackerStatus } from '../../contracts';
-import { DEFAULT_SETTINGS } from '../../contracts';
+import type { PlayArea, SegmentationNeeds, SegmenterState, SegmenterStatus, Stroke, TipSample, TrackerStatus } from '../../contracts';
+import { DEFAULT_SETTINGS, SEGMENTATION_NEED_MAX_MS } from '../../contracts';
 import { TipFilter, type OneEuroParams } from './filter';
 import { QUALITY, sampleInterval, strokeQuality } from './quality';
 
@@ -104,6 +114,12 @@ const WHOLE_MIRROR: PlayArea = { x: 0, y: 0, w: 1, h: 1 };
  * position (fromFirstMove).
  */
 export const AT_REST_SHARE = 0.25;
+/** A tracker's segmentation needs can lower segmenter.minSamples to no fewer than this. */
+export const MIN_SAMPLES_FLOOR = 3;
+/** ... and can raise lostMs and pauseMs to no more than this, so a wrong status cannot keep a tip in
+ *  view, or a stroke open, for long after its samples stop or still. The value is the contract's
+ *  (contracts/events.ts SEGMENTATION_NEED_MAX_MS): the stage holds lostMs needs to it as well. */
+export const MAX_NEED_MS = SEGMENTATION_NEED_MAX_MS;
 
 export type SegmenterOutput =
   | { type: 'segmenter.state'; payload: SegmenterStatus }
@@ -128,6 +144,8 @@ type EndReason = NonNullable<Stroke['endReason']>;
 interface Source {
   aspect: number;
   pen: boolean;
+  /** TrackerStatus.segmentation, checked (validNeeds); null when the tracker asks for nothing. */
+  needs: SegmentationNeeds | null;
 }
 
 /** The hold being timed while hovering: every sample since `anchor` lies within the arm radius of it. */
@@ -244,13 +262,13 @@ export class Segmenter {
     return out;
   }
 
-  /** tracker.status: kept per tracker (aspect and pen). */
+  /** tracker.status: kept per tracker (aspect, pen and segmentation needs). */
   status(status: TrackerStatus, now: number): Out {
     const out: Out = [];
     if (!status || typeof status.tracker !== 'string') return out;
     const aspect = validAspect(status.aspect);
     const before = this.sources.get(status.tracker);
-    this.sources.set(status.tracker, { aspect, pen: status.pen === true });
+    this.sources.set(status.tracker, { aspect, pen: status.pen === true, needs: validNeeds(status.segmentation) });
     this.statusSrc = status.tracker;
     // A new aspect moves every isotropic position: start the filter again.
     if (before && before.aspect !== aspect && status.tracker === this.src) this.tipFilter?.reset();
@@ -281,9 +299,10 @@ export class Segmenter {
     if (this.present && this.last) {
       // A camera tracker's samples that stopped for lostMs mean the tip had gone (contracts/events.ts
       // rule 4), even though the tracker never said so; so does time running backwards.
+      const lostMs = this.lostMsFor(this.src);
       const gap = Math.max(raw.t - this.last.t, now - this.lastArrival);
-      if (raw.t < this.last.t || (!this.isPenSource(this.src) && gap >= this.s.lostMs)) {
-        this.loseTip(Math.min(raw.t, this.last.t + this.s.lostMs), now, out);
+      if (raw.t < this.last.t || (!this.isPenSource(this.src) && gap >= lostMs)) {
+        this.loseTip(Math.min(raw.t, this.last.t + lostMs), now, out);
       }
     }
     if (!this.present) {
@@ -319,10 +338,11 @@ export class Segmenter {
     const out: Out = [];
     if (this.present) {
       if (!this.isPenSource(this.src)) {
-        if (now - this.lastArrival >= this.s.lostMs) {
+        const lostMs = this.lostMsFor(this.src);
+        if (now - this.lastArrival >= lostMs) {
           // End a stroke at the last sample's time + lostMs rather than wait for tip.lost (the bright
           // tip declares a loss only after six missed frames).
-          this.loseTip((this.last?.t ?? now - this.s.lostMs) + this.s.lostMs, now, out);
+          this.loseTip((this.last?.t ?? now - lostMs) + lostMs, now, out);
         }
       } else if (this.last) {
         // A pointer that does not move sends no events but stays where it is: time its stillness.
@@ -484,7 +504,7 @@ export class Segmenter {
     const i = tr.points.length - 1;
     if (tr.stillIndex < 0 || this.distance(p, tr.points[tr.stillIndex]) > this.s.pauseRadius) {
       tr.stillIndex = i;
-    } else if (tr.mode === 'hold-still' && p.t - tr.points[tr.stillIndex].t >= this.s.pauseMs) {
+    } else if (tr.mode === 'hold-still' && p.t - tr.points[tr.stillIndex].t >= this.pauseMsFor(tr.src)) {
       this.endTrace('pause', p.t, now, out);
       return;
     }
@@ -499,7 +519,7 @@ export class Segmenter {
     }
     const tr = this.trace;
     if (this.current !== 'tracing' || !tr || !tr.points.length) return;
-    if (tr.mode === 'hold-still' && tr.stillIndex >= 0 && vt - tr.points[tr.stillIndex].t >= this.s.pauseMs) {
+    if (tr.mode === 'hold-still' && tr.stillIndex >= 0 && vt - tr.points[tr.stillIndex].t >= this.pauseMsFor(tr.src)) {
       this.endTrace('pause', vt, now, out);
     } else if (vt - tr.points[0].t >= this.s.maxMs) {
       this.endTrace('max', vt, now, out);
@@ -513,7 +533,7 @@ export class Segmenter {
     // The trailing still samples are not part of the stroke (Stroke.t1), nor is a pointer's rest
     // after the press (Stroke.t0).
     let points = tr.points.slice(0, this.lastMoving(tr) + 1);
-    if (tr.mode === 'pen' && this.isPenSource(tr.src)) points = this.fromFirstMove(points);
+    if (tr.mode === 'pen' && this.isPenSource(tr.src)) points = this.fromFirstMove(points, tr.src);
     const stroke = this.strokeOf(tr, points, t, reason);
     const discarded = this.discardReason(points, tr.src);
     if (discarded) {
@@ -569,7 +589,7 @@ export class Segmenter {
    *    silence ended, as stillPointer times a resting pointer; the samples after it are kept.
    *  The first point is then a copy with that time, because the sample has gone out as tip.filtered.
    *  A stroke that never left the press position stays as it is. */
-  private fromFirstMove(points: TipSample[]): TipSample[] {
+  private fromFirstMove(points: TipSample[], src: string): TipSample[] {
     const near = this.s.pauseRadius * AT_REST_SHARE;
     let m = 1;
     while (m < points.length && this.distance(points[m], points[0]) <= near) m++;
@@ -578,7 +598,7 @@ export class Segmenter {
     if (!(interval > 0)) return points;
     // The pointer left the press position about one sample interval before the first sample beyond it.
     const left = points[m].t - interval;
-    if (left - points[0].t >= this.s.pauseMs) {
+    if (left - points[0].t >= this.pauseMsFor(src)) {
       const start = points[m - 1];
       return [{ ...start, t: Math.max(start.t, left) }, ...points.slice(m)];
     }
@@ -590,7 +610,7 @@ export class Segmenter {
 
   /** Too short (segmenter.minSamples) or too small (segmenter.minExtent of the play area). */
   private discardReason(points: readonly TipSample[], src: string): Discard | null {
-    if (points.length < this.s.minSamples) return 'too-short';
+    if (points.length < this.minSamplesFor(src)) return 'too-short';
     const pa = this.isPenSource(src) ? WHOLE_MIRROR : sanePlayArea(this.s.playArea);
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const p of points) {
@@ -781,6 +801,29 @@ export class Segmenter {
     return (src && this.sources.get(src)?.aspect) || DEFAULT_ASPECT;
   }
 
+  private needsOf(src: string | null): SegmentationNeeds | null {
+    return (src && this.sources.get(src)?.needs) || null;
+  }
+
+  /** segmenter.lostMs for a tracker's samples: the setting, or the tracker's longer need. */
+  private lostMsFor(src: string | null): number {
+    const need = this.needsOf(src)?.lostMs;
+    return need === undefined ? this.s.lostMs : Math.max(this.s.lostMs, need);
+  }
+
+  /** segmenter.pauseMs for a tracker's samples: the setting, or the tracker's longer need. */
+  private pauseMsFor(src: string | null): number {
+    const need = this.needsOf(src)?.pauseMs;
+    return need === undefined ? this.s.pauseMs : Math.max(this.s.pauseMs, need);
+  }
+
+  /** segmenter.minSamples for a tracker's samples: the setting, or the tracker's smaller need, which
+   *  counts as at least MIN_SAMPLES_FLOOR (a setting below that is the player's own choice). */
+  private minSamplesFor(src: string | null): number {
+    const need = this.needsOf(src)?.minSamples;
+    return need === undefined ? this.s.minSamples : Math.min(this.s.minSamples, Math.max(MIN_SAMPLES_FLOOR, need));
+  }
+
   /** Isotropic distance in frame widths. */
   private distance(a: { x: number; y: number }, b: { x: number; y: number }): number {
     return Math.hypot(a.x - b.x, (a.y - b.y) / this.aspectOf(this.src));
@@ -793,6 +836,19 @@ function validSample(s: TipSample | undefined): s is TipSample {
 
 function validAspect(a: unknown): number {
   return typeof a === 'number' && Number.isFinite(a) && a > 0 ? a : DEFAULT_ASPECT;
+}
+
+/** A tracker's segmentation needs, checked: only finite numbers of zero or more count, and the times
+ *  are held to MAX_NEED_MS. Null when nothing usable is asked for. */
+function validNeeds(n: unknown): SegmentationNeeds | null {
+  if (!n || typeof n !== 'object') return null;
+  const v = n as Record<string, unknown>;
+  const ok = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x) && x >= 0;
+  const out: SegmentationNeeds = {};
+  if (ok(v.lostMs)) out.lostMs = Math.min(v.lostMs, MAX_NEED_MS);
+  if (ok(v.pauseMs)) out.pauseMs = Math.min(v.pauseMs, MAX_NEED_MS);
+  if (ok(v.minSamples)) out.minSamples = v.minSamples;
+  return Object.keys(out).length ? out : null;
 }
 
 /** A play area with a usable size (a zero-width one from a bad setting falls back to the frame). */

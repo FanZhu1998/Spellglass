@@ -18,6 +18,15 @@
       "maximum": 10
     },
     "pen": { "type": "boolean" },
+    "segmentation": {
+      "description": "Contract 1.2: what the recorded tracker's samples needed from the segmenter, its tracker.status segmentation (contracts/events.ts SegmentationNeeds) as the segmenter reads it. A replay publishes it again, so the samples are segmented as they were live. Absent: the tracker needed nothing.",
+      "type": "object",
+      "properties": {
+        "lostMs": { "type": "number", "minimum": 0, "maximum": 2000 },
+        "minSamples": { "type": "number", "minimum": 0, "maximum": 1000 },
+        "pauseMs": { "type": "number", "minimum": 0, "maximum": 2000 }
+      }
+    },
     "settings": {
       "description": "Settings that shaped the pipeline when recorded (only non-default ones). Applied only by test harnesses.",
       "type": "object"

@@ -24,7 +24,8 @@ export const MANIFEST: ModuleManifest = {
   kind: 'effect',
   title: 'Stage',
   version: '1.0.0',
-  contract: '^1.1',
+  // 1.2: reads TrackerStatus.segmentation (the tip's lostMs).
+  contract: '^1.2',
   provides: ['fx.light@1', 'fx.particles@1', 'fx.props@1', 'fx.shapes@1', 'fx.scene@1', 'fx.text@1'],
   requires: ['platform.dom'],
   effects: EFFECTS,

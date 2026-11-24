@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
-  EffectEvent, EffectStep, Envelope, Point, SceneProps, Spellbook, SpellbookEntry, SpellCast, StageSteering,
+  EffectEvent, EffectStep, Envelope, Point, SceneProps, Spellbook, SpellbookEntry, SpellCast, StageSteering, TrackerStatus,
 } from '../../../../contracts';
 import { CAST_SEQUENCE, EFFECT_LIMITS, PROP_IDS, PROP_START, PROP_TAGS } from '../../../../contracts';
 import { createKernel, memoryPersistence, type KernelHost } from '../../../../kernel';
@@ -357,6 +357,76 @@ describe('steering', () => {
     r.props.feather.applied[0].action.done();
     expect(r.kernel.last<StageSteering>('stage.steering')!.payload).toEqual({ castId: null });
     expect(r.of<EffectEvent>('effect.end').find((e) => e.use === 'prop.levitate')?.reason).toBe('done');
+  });
+});
+
+describe('the tip on the glass', () => {
+  const status = (tracker: string, segmentation?: unknown) =>
+    ({ tracker, state: 'tracking', lock: 1, fps: 30, aspect: 16 / 9, pen: false, ...(segmentation ? { segmentation } : {}) }) as TrackerStatus;
+  const sample = (r: Rig, src: string) => r.kernel.emit('tip.filtered', { t: r.now(), x: 0.4, y: 0.5, conf: 1, src }, 'stroke');
+
+  it("counts the tip as gone when the segmenter does: after the tracker's longer lostMs, else the setting's", async () => {
+    const r = await rig();
+    r.kernel.emit('tracker.status', status('tracker.hand', { lostMs: 500, minSamples: 5, pauseMs: 300 }), 'tracker.hand');
+    // A 350 ms dropout the hand tracker and the segmenter bridge: the tip stays, for the glow and for
+    // what follows it (a steered prop), until the segmenter's 500 ms (plus the stage's 50 ms of slack).
+    sample(r, 'tracker.hand');
+    r.advance(350);
+    expect(r.core.liveTip()).toEqual({ x: 0.4, y: 0.5 });
+    r.advance(190);
+    expect(r.core.liveTip()).not.toBeNull();
+    r.advance(30);
+    expect(r.core.liveTip()).toBeNull();
+    // The hand's need is not another tracker's: the bright tip's samples keep the setting's 200 ms.
+    sample(r, 'tracker.bright-tip');
+    r.advance(240);
+    expect(r.core.liveTip()).not.toBeNull();
+    r.advance(30);
+    expect(r.core.liveTip()).toBeNull();
+    // tip.lost still ends it at once.
+    sample(r, 'tracker.hand');
+    r.kernel.emit('tip.lost', { t: r.now(), src: 'tracker.hand' }, 'tracker.hand');
+    expect(r.core.liveTip()).toBeNull();
+  });
+
+  it('reads the need as the segmenter does, and lets a setting that is more forgiving win', async () => {
+    const r = await rig();
+    // Held to SEGMENTATION_NEED_MAX_MS (2 s).
+    r.kernel.emit('tracker.status', status('tracker.hand', { lostMs: 60_000 }), 'tracker.hand');
+    sample(r, 'tracker.hand');
+    r.advance(2000);
+    expect(r.core.liveTip()).not.toBeNull();
+    r.advance(100);
+    expect(r.core.liveTip()).toBeNull();
+    // A need that is no number counts as none, and so does a status without needs.
+    for (const odd of [{ lostMs: -5 }, { lostMs: Number.NaN }, { lostMs: '900' }, undefined]) {
+      r.kernel.emit('tracker.status', status('tracker.hand', odd), 'tracker.hand');
+      sample(r, 'tracker.hand');
+      r.advance(270);
+      expect(r.core.liveTip(), JSON.stringify(odd)).toBeNull();
+    }
+    // segmenter.lostMs 800 beats the hand's 500.
+    r.kernel.emit('tracker.status', status('tracker.hand', { lostMs: 500 }), 'tracker.hand');
+    await r.kernel.settings.set('segmenter.lostMs', 800);
+    sample(r, 'tracker.hand');
+    r.advance(800);
+    expect(r.core.liveTip()).not.toBeNull();
+    r.advance(80);
+    expect(r.core.liveTip()).toBeNull();
+  });
+
+  it('takes the needs of a tracker that reported before the stage started', async () => {
+    const kernel = createKernel({ persistence: memoryPersistence(), features: ['platform.dom'], clock: () => clock });
+    clock = 1000;
+    const core = new StageCore(MANIFEST, { host: null, shelf: { props: [], drawShelf: () => {} }, headless: true, seed: 7 });
+    kernel.register(core.module());
+    await kernel.init();
+    kernel.emit('tracker.status', status('tracker.hand', { lostMs: 500 }), 'tracker.hand');
+    await kernel.start();
+    kernel.emit('tip.filtered', { t: clock, x: 0.4, y: 0.5, conf: 1, src: 'tracker.hand' }, 'stroke');
+    clock += 400;
+    expect(core.liveTip()).not.toBeNull();
+    await kernel.stop();
   });
 });
 

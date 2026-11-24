@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  fingerTip, gripTip, handSize, isValidLandmarks, LANDMARK, LANDMARK_COUNT, landmarksToCaster, tipConfidence, tipFor, toCaster,
+  carriedFingerTip, fingerShape, fingerTip, gripTip, handSize, isValidLandmarks, LANDMARK, LANDMARK_COUNT, landmarksToCaster, tipConfidence,
+  tipFor, toCaster,
 } from './geometry';
 
 const ASPECT = 16 / 9;
@@ -61,6 +62,51 @@ describe('hand geometry', () => {
     expect(gripTip(UPRIGHT, Number.NaN, ASPECT)).toEqual(gripTip(UPRIGHT, 0.9, ASPECT));
     const flat = hand({ wrist: [0.5, 0.5], knuckles: [[0.5, 0.5], [0.5, 0.5], [0.5, 0.5], [0.5, 0.5]], indexTip: [0.5, 0.5] });
     expect(gripTip(flat, 0.9, ASPECT)).toEqual({ x: 0.5, y: 0.5 });
+  });
+
+  it('measures the finger (5 to 8) for the palm (0 to 9), in isotropic units', () => {
+    const s = fingerShape(UPRIGHT, ASPECT);
+    // Index knuckle (0.47, 0.6) to tip (0.46, 0.45); wrist (0.5, 0.8) to middle knuckle (0.49, 0.6).
+    expect(s.finger.x).toBeCloseTo(-0.01, 10);
+    expect(s.finger.y).toBeCloseTo(-0.15 / ASPECT, 10);
+    expect(s.palm.x).toBeCloseTo(-0.01, 10);
+    expect(s.palm.y).toBeCloseTo(-0.2 / ASPECT, 10);
+    expect(s.ratio).toBeCloseTo(Math.hypot(0.01, 0.15 / ASPECT) / Math.hypot(0.01, 0.2 / ASPECT), 10);
+    // A finger dropped onto the fist is short for the same palm.
+    const fist = hand({ wrist: [0.5, 0.8], knuckles: [[0.47, 0.6], [0.49, 0.6], [0.51, 0.6], [0.53, 0.6]], indexTip: [0.47, 0.63] });
+    expect(fingerShape(fist, ASPECT).ratio).toBeLessThan(0.6 * s.ratio);
+  });
+
+  it('carries a finger on the palm: from knuckle 5, turned and scaled as the palm has been since', () => {
+    const good = fingerShape(UPRIGHT, ASPECT);
+    // The same hand carries the finger it has.
+    const same = carriedFingerTip(UPRIGHT, good, ASPECT);
+    expect(same.x).toBeCloseTo(0.46, 10);
+    expect(same.y).toBeCloseTo(0.45, 10);
+
+    // The hand moved, turned a quarter turn clockwise on screen and grew by half, and its fingertip fell
+    // onto the knuckle. Built in isotropic units, then back to the frame's.
+    const isoOf = (p: [number, number]) => ({ x: p[0], y: p[1] / ASPECT });
+    const turn = (v: { x: number; y: number }) => ({ x: -v.y * 1.5, y: v.x * 1.5 });
+    const w0 = isoOf([0.5, 0.8]);
+    const w1 = { x: 0.3, y: 0.3 };
+    const moved = (p: [number, number]) => {
+      const v = turn({ x: isoOf(p).x - w0.x, y: isoOf(p).y - w0.y });
+      return [w1.x + v.x, (w1.y + v.y) * ASPECT] as [number, number];
+    };
+    const knuckles: [number, number][] = [[0.47, 0.6], [0.49, 0.6], [0.51, 0.6], [0.53, 0.6]];
+    const index = moved(knuckles[0]);
+    const turned = hand({ wrist: [w1.x, w1.y * ASPECT], knuckles: knuckles.map(moved), indexTip: [index[0], index[1] + 0.002] });
+    const tip = carriedFingerTip(turned, good, ASPECT);
+    const finger = turn(good.finger);
+    expect(tip.x).toBeCloseTo(index[0] + finger.x, 10);
+    expect(tip.y).toBeCloseTo((isoOf(index).y + finger.y) * ASPECT, 10);
+
+    // A palm of no length has no direction: the finger is carried as it was.
+    const flat = hand({ wrist: [0.5, 0.6], knuckles: [[0.47, 0.6], [0.5, 0.6], [0.51, 0.6], [0.53, 0.6]], indexTip: [0.47, 0.6] });
+    const kept = carriedFingerTip(flat, good, ASPECT);
+    expect(kept.x).toBeCloseTo(0.47 + good.finger.x, 10);
+    expect(kept.y).toBeCloseTo((0.6 / ASPECT + good.finger.y) * ASPECT, 10);
   });
 
   it('flips x into caster space only for unmirrored cameras', () => {

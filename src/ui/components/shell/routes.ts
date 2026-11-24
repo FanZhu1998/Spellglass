@@ -99,6 +99,10 @@ export const TEXT = {
   openingDesktop: 'Opening the camera. If your computer asks, choose Allow.',
   tipNotFound: 'Wand tip not found. Point the tip at the camera and switch on the light beside the lens.',
   handNotFound: 'Hand not found. Hold your hand up where the camera can see it, in good light.',
+  /** The hand tracker's 'hand-too-small' (contracts 1.2): wrist to middle knuckle under 5% of the frame's width. */
+  handTooSmall: 'Your hand looks small to the camera. Step closer, or zoom the camera in.',
+  /** Webcams that track the player (the Insta360 Link 2, for one) pan and zoom the picture under the tip. */
+  followingCamera: 'If your camera follows or reframes you on its own (AI tracking, auto-framing), turn that off in its app while you play.',
   tooManyLights: 'Too many bright lights in view. Dim the lamps behind you, or tune the wand.',
   coachHold: 'Hold still, trace the spell, then hold still again.',
   coachPen: 'Press on the mirror, trace the spell, then let go.',
@@ -184,6 +188,8 @@ export function trackerLine(t: TrackerStatus | null | undefined, route: Route): 
       const starting = t.message === 'Hand model starting' || p >= 0.9;
       return { tone: 'wait', text: starting ? 'Hand model starting.' : 'Hand model loading. It downloads once, then works offline.', progress: p };
     }
+    // Said while the hand is found, too: a small hand is found in fewer and fewer frames.
+    if (t.hint === 'hand-too-small') return { tone: 'warn', text: TEXT.handTooSmall };
     if (t.state === 'tracking') return { tone: 'ok', text: 'Hand found. Your index finger is the wand.' };
     if (t.hint === 'hand-not-found') return { tone: 'warn', text: TEXT.handNotFound };
     if (t.state === 'starting') return { tone: 'wait', text: 'The hand tracker is waiting for the camera.' };

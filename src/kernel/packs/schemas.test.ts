@@ -143,6 +143,13 @@ describe('session/1 and spellglass-data/1', () => {
     const r = checkSession(bad);
     expect(r.ok ? '' : r.reason).toBe('events[0] is missing "y".');
   });
+  it("accept a tracker's segmentation needs (contract 1.2), within what the segmenter applies", () => {
+    expect(checkSession({ ...session, tracker: 'tracker.hand', segmentation: { lostMs: 500, minSamples: 5, pauseMs: 300 } })).toEqual({ ok: true });
+    expect(checkSession({ ...session, segmentation: {} })).toEqual({ ok: true });
+    for (const segmentation of [{ lostMs: -1 }, { pauseMs: 2001 }, { minSamples: 'five' }, 500]) {
+      expect(checkSession({ ...session, segmentation }).ok, JSON.stringify(segmentation)).toBe(false);
+    }
+  });
   it('accept a data export envelope and leave its records to storage', () => {
     const data = { schema: 'spellglass-data/1', dataVersion: 1, settingsVersion: 1, exportedAt: '2026-11-20T10:00:00Z', settings: {}, stores: { progress: [{ key: 'lumos', value: { anything: 1 } }], futurestore: [] } };
     expect(checkUserData(data)).toEqual({ ok: true });

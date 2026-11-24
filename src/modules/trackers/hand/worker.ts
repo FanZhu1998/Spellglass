@@ -8,7 +8,7 @@
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 import { restrictNetwork } from './guard';
 import type { ToWorker } from './protocol';
-import { createWorkerCore, type LandmarkerLike } from './worker-core';
+import { createWorkerCore, frameSize, type LandmarkerLike } from './worker-core';
 
 /** The parts of DedicatedWorkerGlobalScope used here (the project compiles against the DOM library). */
 interface WorkerScope {
@@ -54,20 +54,26 @@ const core = createWorkerCore({
   objectUrl: (bytes, type) => URL.createObjectURL(new Blob([bytes as BlobPart], { type })),
   revokeUrl: (url) => URL.revokeObjectURL(url),
   post: (msg, transfer = []) => scope.postMessage(msg, transfer),
-  preview: (bitmap, flipX) => {
+  // The frame is a VideoFrame from the camera track (at the camera's size) or the video's ImageBitmap;
+  // drawImage takes either, and frameSize reads a VideoFrame's display size.
+  preview: (image, flipX) => {
     if (typeof OffscreenCanvas !== 'function') return null;
-    const w = Math.min(PREVIEW_WIDTH, bitmap.width);
-    const h = Math.max(1, Math.round((w * bitmap.height) / Math.max(1, bitmap.width)));
+    const size = frameSize(image);
+    if (!(size.width > 0 && size.height > 0)) return null;
+    const w = Math.min(PREVIEW_WIDTH, size.width);
+    const h = Math.max(1, Math.round((w * size.height) / size.width));
     if (!previewCanvas || previewCanvas.width !== w || previewCanvas.height !== h) previewCanvas = new OffscreenCanvas(w, h);
     const g = previewCanvas.getContext('2d');
     if (!g) return null;
     g.setTransform(1, 0, 0, 1, 0, 0);
     // Caster orientation (contracts/events.ts TrackerDebugFrame): mirrored like the reflection.
     if (flipX) g.setTransform(-1, 0, 0, 1, w, 0);
-    g.drawImage(bitmap, 0, 0, w, h);
+    g.drawImage(image, 0, 0, w, h);
     return previewCanvas.transferToImageBitmap();
   },
-  // A blank frame the size the tracker feeds (640 x 360) for the warm-up detection (worker-core.ts).
+  // A blank frame for the warm-up detection (worker-core.ts), the size of the bitmaps the 'camera.frame'
+  // path feeds (640 x 360). After it, the fast path's first camera-sized VideoFrames took 20 to 60 ms on
+  // the GPU delegate in the latency study, against 16 ms once running: no second long compile.
   warmupImage: () => (typeof ImageData === 'function' ? new ImageData(640, 360) : null),
   now: () => performance.now(),
 });

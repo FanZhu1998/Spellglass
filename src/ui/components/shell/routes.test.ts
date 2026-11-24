@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SETTINGS, type CameraStatus, type SettingsMap } from '../../../contracts';
-import { TEXT, cameraChip, cameraLine, cameraWanted } from './routes';
+import { DEFAULT_SETTINGS, type CameraStatus, type SettingsMap, type TrackerStatus } from '../../../contracts';
+import { TEXT, cameraChip, cameraLine, cameraWanted, trackerLine } from './routes';
 
 const settings = (s: Partial<SettingsMap>): SettingsMap => ({ ...DEFAULT_SETTINGS, ...s });
 const camera = (s: Partial<CameraStatus>): CameraStatus => ({ state: 'off', generation: 1, permission: 'unknown', ...s });
+const hand = (s: Partial<TrackerStatus>): TrackerStatus => ({ tracker: 'tracker.hand', state: 'searching', lock: 0, fps: 30, aspect: 16 / 9, ...s });
 
 describe('the camera is wanted', () => {
   it('by a camera route, or for the reflection once the camera is allowed', () => {
@@ -51,5 +52,15 @@ describe('the camera line', () => {
     expect(TEXT.blockedDesktop).not.toContain('address bar');
     expect(cameraLine(camera({ state: 'requesting' }), true)?.text).toBe(TEXT.openingDesktop);
     expect(cameraLine(camera({ state: 'requesting' }))?.text).toBe(TEXT.opening);
+  });
+});
+
+describe('the hand tracker line', () => {
+  it('says the hand looks small, also while the hand is found, and when it is not found', () => {
+    expect(trackerLine(hand({ state: 'tracking', hint: null }), 'hand')).toEqual({ tone: 'ok', text: 'Hand found. Your index finger is the wand.' });
+    expect(trackerLine(hand({ state: 'tracking', hint: 'hand-too-small' }), 'hand')).toEqual({ tone: 'warn', text: TEXT.handTooSmall });
+    expect(trackerLine(hand({ state: 'searching', hint: 'hand-too-small' }), 'hand')).toEqual({ tone: 'warn', text: TEXT.handTooSmall });
+    expect(trackerLine(hand({ state: 'searching', hint: 'hand-not-found' }), 'hand')).toEqual({ tone: 'warn', text: TEXT.handNotFound });
+    expect(TEXT.handTooSmall).toMatch(/closer/);
   });
 });

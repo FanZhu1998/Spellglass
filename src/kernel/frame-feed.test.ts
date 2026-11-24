@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ClockMap, startFeed, type FeedFrame } from './feed';
+import { ClockMap, startFeed, type FeedFrame } from './frame-feed';
 
 /** Frame timestamps are on another clock (Chromium: µs of the system's monotonic clock). */
 const BASE_US = 9_000_000_000;

@@ -20,6 +20,25 @@
 //    a real wand does; a wand pointed at the camera foreshortens the projection, which is the main thing
 //    to tune against recordings.
 //
+// The collapsed finger (finger mode). In a quick flick the camera blurs the index finger, and the model,
+// which still finds the hand, can put landmark 8 down on the fist: for a frame or a few the tip jumps a
+// finger's length back toward the palm, and the stroke gets a hook the player never drew. The landmarks
+// themselves show it: the finger (knuckle 5 to tip 8) is suddenly much shorter than it has just been,
+// measured against the palm (wrist 0 to middle knuckle 9), which blur hardly shortens. In such a frame
+// the tip is better guessed from the palm, which the model still places well:
+//
+//        finger F = landmark 8 - landmark 5        palm P = landmark 9 - landmark 0      (isotropic)
+//        ratio = |F| / |P|
+//        tip = landmark 5 + F', where F' is the finger F of the last frame that was not collapsed,
+//              turned by the angle P has turned since and scaled by |P now| / |P then|
+//
+// fingerShape and carriedFingerTip below are that arithmetic; when a frame counts as collapsed is the
+// tracker's per-frame state (tracking.ts). Measured with MediaPipe on clips of a real hand photo moved
+// along the spells' paths with speed blur (the hand study, collapse.mts and estimators.mts): the tip's
+// error in fast motion fell from 0.069 to 0.037 frame widths (95th percentile), and the rule fired on
+// none of more than 2,200 still frames. A line fitted through landmarks 5 to 8 did no better than
+// landmark 8 alone, so it is not used.
+//
 // Caster space (Section 6): x is flipped once, here at the source, when the camera image is unmirrored
 // (setting 'capture.flipX'); y is unchanged. TipSample.size is the hand's scale: wrist-to-middle-knuckle
 // distance ÷ frame width (contracts/v1.ts).
@@ -78,6 +97,47 @@ export function handSize(lm: FlatLandmarks, aspect: number): number {
 /** Finger mode: the index fingertip. */
 export function fingerTip(lm: FlatLandmarks): Point2 {
   return landmark(lm, LANDMARK.INDEX_TIP);
+}
+
+/** The index finger and the palm of one frame, in isotropic units of frame width (see the header). */
+export interface FingerShape {
+  /** Knuckle 5 to fingertip 8. */
+  finger: Point2;
+  /** Wrist 0 to middle knuckle 9. */
+  palm: Point2;
+  /** |finger| ÷ |palm|: how long the finger looks for the hand it is on. */
+  ratio: number;
+}
+
+/** The finger and palm vectors of a hand, and the finger's length for the palm's (the header's ratio).
+ *  `aspect` is the frame's width ÷ height. */
+export function fingerShape(lm: FlatLandmarks, aspect: number): FingerShape {
+  const knuckle = iso(lm, LANDMARK.INDEX_MCP, aspect);
+  const tip = iso(lm, LANDMARK.INDEX_TIP, aspect);
+  const wrist = iso(lm, LANDMARK.WRIST, aspect);
+  const middle = iso(lm, LANDMARK.MIDDLE_MCP, aspect);
+  const finger = { x: tip.x - knuckle.x, y: tip.y - knuckle.y };
+  const palm = { x: middle.x - wrist.x, y: middle.y - wrist.y };
+  return { finger, palm, ratio: Math.hypot(finger.x, finger.y) / Math.max(1e-6, Math.hypot(palm.x, palm.y)) };
+}
+
+/** Where the fingertip would be if the finger still looked as it did in `good`: knuckle 5 plus the
+ *  finger of `good`, turned as the palm has turned since and scaled as it has grown or shrunk (the
+ *  header). Frame-normalized and unflipped, like fingerTip. */
+export function carriedFingerTip(lm: FlatLandmarks, good: FingerShape, aspect: number): Point2 {
+  const knuckle = iso(lm, LANDMARK.INDEX_MCP, aspect);
+  const palm = fingerShape(lm, aspect).palm;
+  const was = Math.hypot(good.palm.x, good.palm.y);
+  const now = Math.hypot(palm.x, palm.y);
+  let fx = good.finger.x, fy = good.finger.y;
+  // A palm of no length has no direction: carry the finger as it was rather than spin it.
+  if (was > 1e-6 && now > 1e-6) {
+    const turn = Math.atan2(palm.y, palm.x) - Math.atan2(good.palm.y, good.palm.x);
+    const c = Math.cos(turn) * (now / was), s = Math.sin(turn) * (now / was);
+    fx = good.finger.x * c - good.finger.y * s;
+    fy = good.finger.x * s + good.finger.y * c;
+  }
+  return { x: knuckle.x + fx, y: (knuckle.y + fy) * aspect };
 }
 
 /** Grip mode: `reach` hand lengths beyond the knuckles, along the wrist-to-knuckles direction (see the

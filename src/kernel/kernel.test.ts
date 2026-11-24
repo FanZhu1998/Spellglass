@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Kernel, Module, ModuleManifest } from '../contracts';
+import { CONTRACT } from '../contracts';
 import { Bus } from './bus';
 import { CapabilitySet } from './capabilities';
 import { createKernel } from './kernel';
@@ -206,6 +207,21 @@ describe('Kernel lifecycle', () => {
     kernel.register(old);
     await kernel.init();
     expect(kernel.modules()[0]).toMatchObject({ state: 'unavailable' });
+  });
+
+  it('runs modules written for 1.1 and 1.2 on this 1.2 kernel, and refuses one that needs 1.3', async () => {
+    expect(CONTRACT).toBe('1.2');
+    const kernel = createKernel({ persistence: memoryPersistence(), features: [] });
+    kernel.register(
+      fakeModule({ id: 'x.one', kind: 'share', contract: '^1.1' }),
+      fakeModule({ id: 'x.two', kind: 'storage', contract: '^1.2' }),
+      fakeModule({ id: 'x.three', kind: 'effect', contract: '^1.3' }),
+    );
+    await kernel.init();
+    const state = Object.fromEntries(kernel.modules().map((m) => [m.manifest.id, m.state]));
+    expect(state['x.one']).not.toBe('unavailable');
+    expect(state['x.two']).not.toBe('unavailable');
+    expect(kernel.modules().find((m) => m.manifest.id === 'x.three')).toMatchObject({ state: 'unavailable', reason: 'speaks contract ^1.3; this kernel is 1.2' });
   });
 
   it('routes requests, attributes them, and rejects when nobody handles a name', async () => {

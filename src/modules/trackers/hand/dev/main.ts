@@ -4,11 +4,21 @@
 //   ?image=/path/to/hand.jpg   use a still image as the camera
 //   ?mode=grip                 grip mode instead of finger mode
 //   ?delegate=cpu              skip the GPU delegate (to compare timings with the fallback)
+//   ?source=video              read frames from the video ('camera.frame') only, as where Chromium's
+//                              MediaStreamTrackProcessor is missing (to compare with the fast path)
 // window.__handHarness exposes the kernel and what was published, for automated checks.
+//
+// mainThreadMs is the tracker's main-thread work per frame, by where its frames come from (status
+// source): on the video path the 'camera.frame' handler, which starts the copy, plus handing the copy
+// to the worker; on the track path (the fast path) the frame's way from the camera track to the worker,
+// timed from when it comes off the track to its postMessage, with the 'camera.frame' handler, there
+// only the fast path's watchdog, apart. Both paths add the worker's answer (result). Medians and
+// maxima over the last 300 frames; the stand-ins that time them add a few microseconds.
 
 import type { Envelope, TipSample, TrackerDebugFrame, TrackerStatus } from '../../../../contracts';
 import { createKernel, memoryPersistence, on } from '../../../../kernel';
-import { browserHandDeps, buildHandTracker, type HandDeps } from '../index';
+import { browserHandDeps, buildHandTracker, type HandDeps, type WorkerLike } from '../index';
+import type { FromWorker } from '../protocol';
 import { createDevCamera } from './camera';
 
 const params = new URLSearchParams(location.search);
@@ -34,16 +44,80 @@ const handlerMs: number[] = [];
 let frameStart = 0;
 kernel.subscribe('camera.frame', () => (frameStart = performance.now()));
 
+/** The rest of the tracker's main-thread work per frame (see the header): handing a frame to the worker,
+ *  from the track (trackMs) or as a copy of the video (copyMs), and the worker's answer (resultMs). */
+const trackMs: number[] = [];
+const copyMs: number[] = [];
+const resultMs: number[] = [];
+const note = (list: number[], ms: number) => {
+  list.push(Math.round(ms * 1000) / 1000);
+  if (list.length > 300) list.shift();
+};
+/** The frame last read off the camera track, or the last copy of the video made, and when. */
+let fromTrack: { frame: VideoFrame; at: number } | null = null;
+let fromVideo: { bitmap: ImageBitmap; at: number } | null = null;
+
 const deps: HandDeps = browserHandDeps();
-if (params.get('delegate') === 'cpu') {
-  const make = deps.createWorker;
-  deps.createWorker = () => {
-    const w = make();
-    const post = w.postMessage.bind(w);
-    w.postMessage = (m, transfer) => post(m.type === 'load' ? { ...m, delegate: 'CPU' } : m, transfer);
-    return w;
+const cpu = params.get('delegate') === 'cpu';
+const make = deps.createWorker;
+deps.createWorker = () => {
+  const w = make();
+  // The tracker talks to this stand-in, which times what it hands over and what comes back.
+  const timed: WorkerLike = {
+    onmessage: null,
+    onerror: null,
+    postMessage(m, transfer) {
+      // A frame seen coming off the track, or a copy of the video seen made: timed from then to here.
+      const from = m.type !== 'frame' ? null
+        : m.image === fromTrack?.frame ? { list: trackMs, at: fromTrack.at }
+          : m.image === fromVideo?.bitmap ? { list: copyMs, at: fromVideo.at } : null;
+      w.postMessage(cpu && m.type === 'load' ? { ...m, delegate: 'CPU' } : m, transfer);
+      if (from) note(from.list, performance.now() - from.at);
+      fromTrack = fromVideo = null;
+    },
+    terminate: () => w.terminate(),
+  };
+  w.onmessage = (e: MessageEvent<FromWorker>) => {
+    const began = performance.now();
+    timed.onmessage?.(e);
+    if (e.data.type === 'result') note(resultMs, performance.now() - began);
+  };
+  w.onerror = (e) => timed.onerror?.(e);
+  return timed;
+};
+if (params.get('source') === 'video') {
+  deps.openProcessor = null;
+} else if (deps.openProcessor) {
+  // The track's frames pass through a stand-in stream that notes when each one comes off the track. It
+  // reads only when the tracker does (highWaterMark 0), so the processor's one-frame buffer stays the
+  // only buffer.
+  const open = deps.openProcessor;
+  deps.openProcessor = (track, maxBufferSize) => {
+    const readable = open(track, maxBufferSize);
+    if (!readable) return null;
+    const reader = readable.getReader();
+    return new ReadableStream<VideoFrame>({
+      async pull(c) {
+        const { value, done } = await reader.read();
+        if (done) {
+          c.close();
+          return;
+        }
+        fromTrack = { frame: value, at: performance.now() };
+        c.enqueue(value);
+      },
+      cancel: (reason) => reader.cancel(reason),
+    }, { highWaterMark: 0 });
   };
 }
+const grab = deps.grabFrame;
+deps.grabFrame = (video, width, height) => {
+  const pending = grab(video, width, height);
+  return pending && pending.then((bitmap) => {
+    fromVideo = { bitmap, at: performance.now() };
+    return bitmap;
+  });
+};
 
 kernel.register(
   createDevCamera({ image: params.get('image') }),
@@ -93,13 +167,26 @@ function draw(): void {
   g.beginPath();
   trail.forEach((s, i) => (i ? g.lineTo(s.x * W, s.y * H) : g.moveTo(s.x * W, s.y * H)));
   g.stroke();
-  const sorted = [...handlerMs].sort((a, b) => a - b);
   statusEl.textContent = JSON.stringify({
     status,
     loadMs: readyAt === null ? null : Math.round(readyAt - loadStarted),
-    mainThreadFrameMs: sorted.length ? { median: sorted[sorted.length >> 1], max: sorted[sorted.length - 1] } : null,
+    mainThreadMs: mainThread(),
     samples: events.filter((e) => e.type === 'tip.sample').length,
   }, null, 2);
+}
+
+function spread(list: readonly number[]): { median: number; max: number } | null {
+  if (!list.length) return null;
+  const sorted = [...list].sort((a, b) => a - b);
+  return { median: sorted[sorted.length >> 1], max: sorted[sorted.length - 1] };
+}
+
+/** The tracker's main-thread work per frame, for the source its status names (see the header). */
+function mainThread(): Record<string, unknown> | null {
+  const source = status?.source;
+  if (source === 'track') return { source, fromTrack: spread(trackMs), result: spread(resultMs), watchdog: spread(handlerMs) };
+  if (source === 'video') return { source, cameraFrame: spread(handlerMs), sendCopy: spread(copyMs), result: spread(resultMs) };
+  return null;
 }
 
 async function boot(): Promise<void> {
@@ -113,5 +200,7 @@ async function boot(): Promise<void> {
   draw();
 }
 
-Object.defineProperty(window, '__handHarness', { value: { kernel, events, handlerMs, get status() { return status; }, get debug() { return debug; } } });
+Object.defineProperty(window, '__handHarness', {
+  value: { kernel, events, handlerMs, trackMs, copyMs, resultMs, mainThread, get status() { return status; }, get debug() { return debug; } },
+});
 void boot();

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { FromWorker, ToWorker } from './protocol';
-import { createWorkerCore, firstHand, type LandmarkerLike, type WorkerCoreDeps } from './worker-core';
+import type { FrameImage, FromWorker, ToWorker } from './protocol';
+import { createWorkerCore, firstHand, frameSize, type LandmarkerLike, type WorkerCoreDeps } from './worker-core';
 
 const BASE = 'https://app.test/models/wasm';
 const FILES = { wasmLoaderPath: `${BASE}/vision_wasm_module_internal.js`, wasmBinaryPath: `${BASE}/vision_wasm_module_internal.wasm` };
@@ -19,6 +19,8 @@ interface Setup {
   deps: WorkerCoreDeps;
   posted: { msg: FromWorker; transfer?: Transferable[] }[];
   detectTimes: number[];
+  /** What the model was given, and whether it was still open then. */
+  detected: { image: unknown; open: boolean }[];
   created: Parameters<WorkerCoreDeps['createLandmarker']>[0][];
   revoked: string[];
   scene: { hand: boolean; throwOnDetect: boolean };
@@ -28,13 +30,16 @@ interface Setup {
 function setup(opts: { files?: Record<string, Response | 'throw'>; createFails?: string } = {}): Setup {
   const posted: Setup['posted'] = [];
   const detectTimes: number[] = [];
+  const detected: Setup['detected'] = [];
   const created: Setup['created'] = [];
   const revoked: string[] = [];
   const scene = { hand: true, throwOnDetect: false };
   const landmarker = {
     closed: false,
-    detectForVideo(_img: ImageBitmap, ts: number) {
+    detectForVideo(img: FrameImage | ImageData, ts: number) {
       detectTimes.push(ts);
+      const close = (img as { close?: ReturnType<typeof vi.fn> }).close;
+      detected.push({ image: img, open: !close || close.mock.calls.length === 0 });
       if (scene.throwOnDetect) throw new Error('WebGL context lost');
       return scene.hand ? { landmarks: [landmarks()], handedness: [[{ score: 0.93, categoryName: 'Left' }]] } : { landmarks: [], handedness: [] };
     },
@@ -67,7 +72,7 @@ function setup(opts: { files?: Record<string, Response | 'throw'>; createFails?:
     preview: (_b, flipX) => ({ width: 320, height: 180, flipX, close: vi.fn() }) as unknown as ImageBitmap,
     now: () => (clock += 4),
   };
-  return { deps, posted, detectTimes, created, revoked, scene, landmarker };
+  return { deps, posted, detectTimes, detected, created, revoked, scene, landmarker };
 }
 
 const load = (delegate: 'GPU' | 'CPU' = 'GPU'): ToWorker => ({ type: 'load', run: 1, wasmBaseUrl: `${BASE}/`, modelUrl: MODEL_URL, delegate });
@@ -76,8 +81,13 @@ function bitmap() {
   return { width: 640, height: 360, close: vi.fn() } as unknown as ImageBitmap & { close: ReturnType<typeof vi.fn> };
 }
 
-function frameMsg(t: number, b = bitmap(), preview = false): ToWorker {
-  return { type: 'frame', run: 1, generation: 2, t, frame: 7, width: 1920, height: 1080, bitmap: b, preview, flipX: true };
+/** A camera track's frame (the fast path): sized by displayWidth and displayHeight, as MediaPipe does. */
+function videoFrame() {
+  return { displayWidth: 1920, displayHeight: 1080, codedWidth: 1920, codedHeight: 1088, timestamp: 9e9, close: vi.fn() } as unknown as VideoFrame & { close: ReturnType<typeof vi.fn> };
+}
+
+function frameMsg(t: number, image: FrameImage = bitmap(), preview = false, seq = 41): ToWorker {
+  return { type: 'frame', run: 1, seq, generation: 2, t, frame: 7, width: 1920, height: 1080, image, preview, flipX: true };
 }
 
 describe('hand worker core', () => {
@@ -147,7 +157,8 @@ describe('hand worker core', () => {
     const b = bitmap();
     await core.handle(frameMsg(1000.4, b));
     const out = s.posted.at(-1)!.msg;
-    expect(out).toMatchObject({ type: 'result', run: 1, generation: 2, t: 1000.4, frame: 7, width: 1920, height: 1080, stepMs: 4 });
+    // The frame's own seq comes back with its answer (the tracker matches answers to the frame it waits for).
+    expect(out).toMatchObject({ type: 'result', run: 1, seq: 41, generation: 2, t: 1000.4, frame: 7, width: 1920, height: 1080, stepMs: 4 });
     const hand = (out as Extract<FromWorker, { type: 'result' }>).hand!;
     expect(hand.points).toHaveLength(63);
     expect(hand.points.slice(24, 26)).toEqual([0.3, 0.4]);
@@ -185,9 +196,56 @@ describe('hand worker core', () => {
     await core.handle(load());
     s.scene.throwOnDetect = true;
     const b = bitmap();
-    await core.handle(frameMsg(1000, b));
-    expect(s.posted.at(-1)!.msg).toMatchObject({ type: 'error', run: 1, generation: 2, message: 'WebGL context lost' });
+    await core.handle(frameMsg(1000, b, false, 42));
+    expect(s.posted.at(-1)!.msg).toMatchObject({ type: 'error', run: 1, seq: 42, generation: 2, message: 'WebGL context lost' });
     expect(b.close).toHaveBeenCalled();
+  });
+
+  it("detects the camera track's VideoFrame as it is, then closes it", async () => {
+    const s = setup();
+    const core = createWorkerCore(s.deps);
+    await core.handle(load());
+    const f = videoFrame();
+    await core.handle(frameMsg(1000.4, f, true));
+    // The frame itself, still open while the model read it; closed once, after it and the preview.
+    expect(s.detected).toHaveLength(1);
+    expect(s.detected[0].image === f && s.detected[0].open).toBe(true);
+    expect(f.close).toHaveBeenCalledTimes(1);
+    const out = s.posted.at(-1)!.msg as Extract<FromWorker, { type: 'result' }>;
+    expect(out).toMatchObject({ type: 'result', t: 1000.4, frame: 7, width: 1920, height: 1080 });
+    expect(out.hand).not.toBeNull();
+    expect(out.preview).toBeTruthy();
+  });
+
+  it('closes a VideoFrame when detection fails, and when no model is loaded', async () => {
+    const s = setup();
+    const core = createWorkerCore(s.deps);
+    const early = videoFrame();
+    await core.handle(frameMsg(900, early, false, 3));
+    expect(early.close).toHaveBeenCalledTimes(1);
+    expect(s.posted.at(-1)!.msg).toMatchObject({ type: 'error', seq: 3, message: 'The hand model is not loaded yet.' });
+    await core.handle(load());
+    s.scene.throwOnDetect = true;
+    const f = videoFrame();
+    await core.handle(frameMsg(1000, f));
+    expect(s.posted.at(-1)!.msg).toMatchObject({ type: 'error', run: 1, generation: 2, message: 'WebGL context lost' });
+    expect(f.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the detection when the preview fails, and closes the frame', async () => {
+    const s = setup();
+    s.deps.preview = () => {
+      throw new Error('no 2d context');
+    };
+    const core = createWorkerCore(s.deps);
+    await core.handle(load());
+    const f = videoFrame();
+    await core.handle(frameMsg(1000, f, true));
+    const out = s.posted.at(-1)!.msg as Extract<FromWorker, { type: 'result' }>;
+    expect(out.type).toBe('result');
+    expect(out.hand).not.toBeNull();
+    expect(out.preview).toBeUndefined();
+    expect(f.close).toHaveBeenCalledTimes(1);
   });
 
   it('closes frames that arrive before the model, and the landmarker on close', async () => {
@@ -200,6 +258,13 @@ describe('hand worker core', () => {
     await core.handle(load());
     await core.handle({ type: 'close', run: 1 });
     expect(s.landmarker.closed).toBe(true);
+  });
+});
+
+describe('frameSize', () => {
+  it("reads a VideoFrame's display size and an ImageBitmap's own", () => {
+    expect(frameSize(videoFrame())).toEqual({ width: 1920, height: 1080 });
+    expect(frameSize(bitmap())).toEqual({ width: 640, height: 360 });
   });
 });
 

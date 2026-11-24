@@ -32,6 +32,8 @@
     if (t.state === 'loading' || t.state === 'starting') return { state: 'warn', text: `${what} tracker starting` };
     if (t.state === 'stopped') return { state: 'off', text: `${what} tracker off` };
     if (t.state === 'error') return { state: 'error', text: `${what} tracker stopped` };
+    // Found or not, a hand that small is followed badly: the mirror's note says what to do.
+    if (t.hint === 'hand-too-small') return { state: 'warn', text: 'hand looks small' };
     if (t.state === 'tracking') return { state: 'on', text: `${what} found` };
     if (t.hint === 'tip-not-found' || t.hint === 'hand-not-found') return { state: 'warn', text: `${what} not found` };
     if (t.hint === 'too-many-lights') return { state: 'warn', text: 'too many bright lights' };

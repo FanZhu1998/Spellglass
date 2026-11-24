@@ -358,6 +358,7 @@
             <span>Mirror the picture left to right</span>
           </label>
           <p class="help after-switch">Leave this on for ordinary webcams. Turn it off if your camera already mirrors its picture and the tip moves the wrong way.</p>
+          <p class="help">{TEXT.followingCamera}</p>
 
           <DistanceGuide width={cam?.width} height={cam?.height} fps={cam?.fps} steppedDown={cam?.steppedDown} seated={isSeated(app.settings.playArea)} />
         </ToolSection>

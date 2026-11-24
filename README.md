@@ -16,7 +16,7 @@ The desktop app is Spellglass in one file: no browser, no internet connection, n
 
 **Mac.** Open `Spellglass-0.1.0-mac.dmg` and drag Spellglass onto Applications, then open it from there. It runs on Apple silicon and Intel Macs alike. Until the app is signed, macOS refuses it the first time ("Apple could not verify…"): open **System Settings › Privacy & Security**, scroll to the message about Spellglass, choose **Open Anyway** and confirm. After that it opens like any other app. `Spellglass-0.1.0-mac.zip` holds the same app, for those who prefer it to a disk image.
 
-**The camera.** The first time you choose a camera route on a Mac, macOS asks whether Spellglass may use the camera: choose Allow (if you chose not to, turn Spellglass on in System Settings › Privacy & Security › Camera). Windows does not ask, but desktop apps must be allowed the camera in Settings › Privacy & security › Camera.
+**The camera.** The first time you choose a camera route on a Mac, macOS asks whether Spellglass may use the camera: choose Allow (if you chose not to, turn Spellglass on in System Settings › Privacy & Security › Camera). Windows does not ask, but desktop apps must be allowed the camera in Settings › Privacy & security › Camera. Casting with your hand? See [Playing with your hand](#playing-with-your-hand) for the camera features to turn off.
 
 - **F11** turns full screen on and off (on a Mac: Control-Command-F, or the green button).
 - Progress, drawings, keepsakes and settings stay on the computer (`%APPDATA%\Spellglass` on Windows, `~/Library/Application Support/Spellglass` on a Mac) and survive closing the app and new versions of it. They are separate from Spellglass in a browser: to move them, use Workshop › Your data › Export my data, and import the file on the other side.
@@ -99,6 +99,16 @@ Access (Workshop › Settings): seated play (a smaller play area, lower in the v
 
 Start with the one-evening test in Appendix A of the blueprint. The tip finder at `/tools/tip-finder.html` (`http://localhost:5173/tools/tip-finder.html` while `npm run dev` runs) shows what the tracker sees and the tip's brightness against the brightest background (aim for 3× or more). It can also record a 10-second session as a test fixture. It shares the app's settings on purpose, so the threshold and exposure you find become the app's starting values.
 
+### Playing with your hand
+
+"My hand or finger" follows your index fingertip with a hand-landmark model, which needs a steady, clear picture of the hand:
+
+- **Turn off what moves or reworks the picture**, in the camera's own app, while you play. Some webcams, the Insta360 Link 2 among them, do all of this: AI tracking and auto-framing pan and zoom the picture under your finger, gesture control may zoom or start tracking when it sees your raised hand, and HDR or other processing that merges or smooths frames can smear a quick flick.
+- **Light the hand** from the front or the side, not with a bright window behind you.
+- **Stand close enough that your hand is not tiny.** Once your palm, wrist to middle knuckle, spans less than about 5% of the picture's width, the model finds the hand in fewer and fewer frames; a wide or 4K webcam makes a hand that small at 1.5 to 2 m. The mirror then says "Your hand looks small to the camera": step closer, or zoom the camera in.
+
+Short gaps are forgiven: the tracker keeps your fingertip through 0.4 s without a hand, and when a quick flick blurs your finger into your fist, the tip stays where the finger would be.
+
 ## The spells
 
 27 spells in three packs: 12 core charms, 12 further spells, and the restricted section, which is off by default. Spells open in tiers as you learn them (three good casts each); "Open every spell" in the Workshop skips the staging. You can redraw any gesture your own way in the Workshop; your drawing is stored on your device and the pack is left alone.
@@ -132,7 +142,7 @@ On Windows, run the tests through npm (or `node tools/run-vitest.mjs`): Vitest s
 
 The end-to-end tests run Chrome with `--disable-gpu`. Headless Chrome draws through a software GPU that compiles its shaders the first time the stage uses a canvas effect, which holds input back for several seconds on the first press; the tests check what the app does, not how the GPU draws it.
 
-The desktop tests use `--disable-gpu` on Windows only (`GPU_SWITCHES` in `tests/desktop/app.ts`). On a Mac, Chromium has no software GL to fall back on: with that switch its GPU process gives up at the start, which leaves no WebGL (the hand tracker's MediaPipe needs it, on the CPU too) and the camera at 5 frames a second. So on a Mac they run with the machine's GPU, as players do.
+The desktop tests use `--disable-gpu` on Windows only (`GPU_SWITCHES` in `tests/desktop/app.ts`). On a Mac, Chromium has no software GL to fall back on: with that switch its GPU process gives up at the start, which leaves no WebGL (the hand tracker's MediaPipe needs it, on the CPU too) and the camera at 5 frames a second. So on a Mac they run with the machine's GPU, as players do. On Windows the hand tracker's GPU delegate then runs on software WebGL, about ten times slower than its CPU delegate, so after its first ten frames the tracker loads the model again on the CPU, as it does for a player without a usable GPU; the log says so.
 
 ## How it is built
 
@@ -143,8 +153,8 @@ camera → capture → tracker → filter and segmenter → recognizer → spell
                                               voice ↗
 ```
 
-- `src/contracts/` holds the only things modules share: data types, events, requests, settings, pack formats and JSON Schemas. Contract 1.1 is the blueprint's 1.0 plus additive fields, each marked `@since 1.1`.
-- `src/kernel/` holds the bus (run to completion), the module registry and lifecycle, feature detection, settings, named requests and the pack loader.
+- `src/contracts/` holds the only things modules share: data types, events, requests, settings, pack formats and JSON Schemas. Contract 1.2 is the blueprint's 1.0 plus additive fields, each marked `@since 1.1` or `@since 1.2` (1.2 adds a tracker's segmentation needs and the 'hand-too-small' hint to `tracker.status`, and the same needs to a recorded session, so that it replays as it played).
+- `src/kernel/` holds the bus (run to completion), the module registry and lifecycle, feature detection, settings, named requests and the pack loader, and the frame feed both camera trackers read the camera track through where Chromium allows it (`frame-feed.ts`).
 - `src/modules/` holds one folder per module. Modules never import each other; `npm run lint:deps` fails the build if one does.
 - `src/ui/` is the Svelte 5 shell. It talks to the kernel, never to modules.
 - `src/main.ts` is the only file that wires modules together.
@@ -180,6 +190,8 @@ Everything above is covered by about 1,500 automated tests, and the camera pipel
 - camera exposure control (Chrome's fake camera offers none);
 - voice with a real microphone and a downloaded language pack;
 - the hand tracker's grip mode, which needs tuning against real casts;
+- the hand route's rules for gaps, collapsed fingers and small hands, which were measured on simulated hand noise and on clips of a hand photo, not yet on a live hand;
+- the hand tracker reading the camera track directly, which was measured as a prototype with Chrome's fake camera, and its move to the CPU when the GPU delegate is slow, neither yet with a real webcam;
 - the sounds, which were measured for level but not judged by ear;
 - the Mac desktop app, which only the workflow builds (on `macos-latest`): it has not been opened on a Mac yet.
 

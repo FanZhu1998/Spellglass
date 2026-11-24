@@ -97,7 +97,8 @@ describe('stroke module', () => {
   });
 
   it('keeps the manifest id and kind the app depends on', () => {
-    expect(MANIFEST).toMatchObject({ id: 'segmenter.hold-still', kind: 'segmenter', contract: '^1.1', version: '1.0.0', provides: ['stroke.source'] });
+    // ^1.2: it reads TrackerStatus.segmentation.
+    expect(MANIFEST).toMatchObject({ id: 'segmenter.hold-still', kind: 'segmenter', contract: '^1.2', version: '1.0.0', provides: ['stroke.source'] });
   });
 
   it('reports searching on start and publishes tip.filtered for every sample at once, same t and src', async () => {

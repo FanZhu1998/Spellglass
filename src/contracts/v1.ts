@@ -2,14 +2,20 @@
 //
 // The data that flows through the pipeline. These types are the only thing modules share.
 // Within version 1, changes are additive: new fields are optional, nothing is removed or
-// given a new meaning. Fields marked `@since 1.1` were added while implementing the blueprint.
+// given a new meaning. Fields marked `@since 1.1` were added while implementing the blueprint,
+// fields marked `@since 1.2` after measuring the hand route.
 
 /**
  * Contract version. 1.0 is the set in the blueprint (Section 6). 1.1 adds, without changing
  * anything in 1.0: camera, segmenter, replay and storage events, request/response on the kernel,
  * sticky "last value" reads, fizzle and practice details, and the optional fields marked below.
+ * 1.2 adds, without changing anything in 1.1, two optional parts of tracker.status
+ * (contracts/events.ts TrackerStatus): the hint 'hand-too-small', and `segmentation`, the segmenter
+ * rules a tracker's samples need (SegmentationNeeds, held to SEGMENTATION_NEED_MAX_MS); and the same
+ * `segmentation` in a recorded session (contracts/session.ts RecordedSession), so that a replay keeps
+ * it. Modules that use none of these still say '^1.1'.
  */
-export const CONTRACT = '1.1';
+export const CONTRACT = '1.2';
 
 /** Engine version that pack `engine` ranges are checked against (Section 9.2). */
 export const ENGINE_VERSION = '1.1.0';

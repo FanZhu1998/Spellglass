@@ -137,6 +137,24 @@ describe('replay tracker', () => {
     expect(h.kernel.settings.get('tracker.active', '')).toBe('tracker.player');
   });
 
+  it("announces the recorded tracker's segmentation needs with the session, and none for a session without", async () => {
+    const needs = { lostMs: 500, minSamples: 5, pauseMs: 300 };
+    await h.kernel.request('replay.play', { session: session(SHORT, { segmentation: needs }), speed: 0 });
+    const statuses = () => h.of<TrackerStatus>('tracker.status').map((s) => s.payload).filter((s) => s.tracker === 'tracker.replay');
+    const firstTip = h.published.findIndex((p) => p.type.startsWith('tip.'));
+    const before = h.published.slice(0, firstTip).filter((p) => p.type === 'tracker.status' && (p.env.payload as TrackerStatus).tracker === 'tracker.replay');
+    // Before any tip event, so the segmenter treats the samples as it did live.
+    expect(before.length).toBeGreaterThan(0);
+    for (const p of before) expect((p.env.payload as TrackerStatus).segmentation).toEqual(needs);
+    expect(statuses().find((s) => s.state === 'tracking')!.segmentation).toEqual(needs);
+    await vi.advanceTimersByTimeAsync(0);
+    h.published.length = 0;
+    await h.kernel.request('replay.play', { session: session(SHORT), speed: 0 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(statuses().length).toBeGreaterThan(0);
+    for (const s of statuses()) expect(s.segmentation).toBeUndefined();
+  });
+
   it('keeps the spacing at other speeds and publishes everything at once at speed 0', async () => {
     const fast = h.kernel.request<{ played: number }>('replay.play', { session: session(SHORT), speed: 2 });
     await vi.advanceTimersByTimeAsync(0);

@@ -256,6 +256,8 @@
               />
               <span>No light to hand? Light the tip with a white band across the top of the screen.</span>
             </label>
+          {:else if chosen === 'hand'}
+            <p class="hand-note">{TEXT.followingCamera}</p>
           {/if}
         </div>
       {/if}
@@ -697,6 +699,15 @@
 
   /* On the letter the switch is a box ruled in ink, ticked when on (components.css). */
   .light-switch {
+    padding-top: 10px;
+    border-top: 1px dashed rgb(43 33 24 / 0.24);
+    font-size: var(--text-small);
+    line-height: 1.4;
+  }
+
+  /* The hand route's postscript about the camera, ruled off as the wand's light switch is. */
+  .hand-note {
+    margin: 0;
     padding-top: 10px;
     border-top: 1px dashed rgb(43 33 24 / 0.24);
     font-size: var(--text-small);

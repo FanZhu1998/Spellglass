@@ -158,6 +158,8 @@
         return 'Wand tip not found. Point the tip at the camera and switch on the light beside the lens.';
       case 'hand-not-found':
         return 'Hand not found. Hold your hand up where the camera can see it, in good light.';
+      case 'hand-too-small':
+        return 'Your hand looks small to the camera. Step closer, or zoom the camera in.';
       case 'too-many-lights':
         return 'Too many bright lights in view. Dim the lamps behind you, or tune the wand.';
       default:

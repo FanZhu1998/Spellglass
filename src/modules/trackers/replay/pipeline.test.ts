@@ -8,9 +8,9 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Envelope, Module, RecordedSession, SessionEvent, SpellCast, SpellFizzle, TipSample } from '../../../contracts';
+import type { Envelope, Module, RecordedSession, SessionEvent, SpellCast, SpellFizzle, Stroke, TipSample } from '../../../contracts';
 import { checkSession, createKernel, memoryPersistence, on, type KernelHost } from '../../../kernel';
-import { fakeEffects, fileFetch, loadSession, PACK_INDEX_URL } from '../../../../tests/pipeline/harness';
+import { fakeEffects, fileFetch, HAND_NEEDS, handCastEvents, loadSession, PACK_INDEX_URL } from '../../../../tests/pipeline/harness';
 import { createDiagnosticsModule } from '../../diagnostics';
 import { createTemplateRecognizer } from '../../recognizers/template';
 import { createSpellEngine } from '../../spell-engine';
@@ -182,6 +182,63 @@ describe('the recorder and the replay tracker round-trip', () => {
       r.events.length = 0;
       await k.request('replay.play', { session: recorded, speed: 0 });
       expect(asSessionEvents(r.events, k.now())).toEqual(recorded.events);
+    } finally {
+      await r.kernel.stop();
+    }
+  });
+
+  it('records a hand session with its segmentation needs, and replays it as it was segmented live', async () => {
+    const r = await rig({}, [createDiagnosticsModule()]);
+    try {
+      const k = r.kernel;
+      const src = 'tracker.hand';
+      const strokes: Stroke[] = [];
+      on(k, 'stroke.end', (s) => strokes.push(s));
+      // A stroke as the segmenter cut it: how many samples, how it ended, and where (filtered; to a
+      // millionth, since re-based capture times move the filter's arithmetic in the last digits).
+      const r6 = (v: number) => Math.round(v * 1e6) / 1e6;
+      const shape = (s: Stroke) => ({ src: s.src, points: s.points.length, endReason: s.endReason, end: [r6(s.points.at(-1)!.x), r6(s.points.at(-1)!.y)] });
+      // The hand tracker's status carries its needs (contracts 1.2), as every one of its statuses does.
+      k.publish({ type: 'tracker.status', v: 1, t: k.now(), source: src, payload: { tracker: src, state: 'tracking', lock: 1, fps: 30, aspect: 16 / 9, pen: false, segmentation: HAND_NEEDS } });
+      await k.request('session.record.start', { title: 'Hand' });
+      const t0 = k.now();
+      // Live: a hand cast with a 350 ms dropout that the needs let the segmenter bridge.
+      let now = 0;
+      for (const e of handCastEvents()) {
+        if (e.t > now) {
+          await vi.advanceTimersByTimeAsync(e.t - now);
+          now = e.t;
+        }
+        const t = t0 + e.t;
+        if (e.type === 'tip.lost') k.publish({ type: 'tip.lost', v: 1, t, source: src, payload: { t, src, lastSeen: e.lastSeen !== undefined ? t0 + e.lastSeen : undefined } });
+        else if (e.type === 'tip.found' || e.type === 'tip.sample') k.publish({ type: e.type, v: 1, t, source: src, payload: { t, x: e.x, y: e.y, conf: e.conf, src, ...('size' in e && e.size !== undefined ? { size: e.size } : {}) } });
+      }
+      await vi.advanceTimersByTimeAsync(3000);
+      const stopping = k.request<RecordedSession>('session.record.stop');
+      await vi.advanceTimersByTimeAsync(2500);
+      const recorded = await stopping;
+      expect(recorded).toMatchObject({ tracker: src, segmentation: HAND_NEEDS });
+      expect(checkSession(recorded)).toEqual({ ok: true });
+      const live = strokes.splice(0).map(shape);
+      // One stroke across the 350 ms dropout, ended by the pause at the end of the cast.
+      expect(live).toEqual([{ src, points: expect.any(Number), endReason: 'pause', end: [expect.closeTo(0.65, 2), expect.closeTo(0.3, 1)] }]);
+      expect(live[0].points).toBeGreaterThan(30);
+
+      // Played back at its pace: the replay announces the needs with the session, and the stroke is the same.
+      const done = k.request('replay.play', { session: recorded, speed: 1 });
+      await vi.advanceTimersByTimeAsync(recorded.events.at(-1)!.t + 3000);
+      await done;
+      expect(strokes.splice(0).map(shape)).toEqual(live.map((s) => ({ ...s, src: 'tracker.replay' })));
+
+      // Without them (a session recorded before contracts 1.2), the same samples are cut at the dropout.
+      await vi.advanceTimersByTimeAsync(0);
+      const bare: RecordedSession = { ...recorded };
+      delete bare.segmentation;
+      const plain = k.request('replay.play', { session: bare, speed: 1 });
+      await vi.advanceTimersByTimeAsync(recorded.events.at(-1)!.t + 3000);
+      await plain;
+      expect(strokes[0]).toMatchObject({ src: 'tracker.replay', endReason: 'lost' });
+      expect(strokes[0].points.length).toBeLessThan(live[0].points / 2);
     } finally {
       await r.kernel.stop();
     }

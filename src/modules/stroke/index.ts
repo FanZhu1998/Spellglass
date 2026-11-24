@@ -3,9 +3,10 @@
 // One Euro filter of filter.ts), publishes what comes back in order, and drives time with a ticker.
 // All the behavior lives in those files and is unit-tested without a browser.
 //
-// Inputs:  tip.sample, tip.found, tip.lost, tracker.status (kept per tracker); spell.cast,
-//          spell.fizzle and spell.pending (the decision on our stroke); replay.state and voice.status;
-//          settings filter.*, segmenter.*, playArea and engine.mode.
+// Inputs:  tip.sample, tip.found, tip.lost, tracker.status (kept per tracker, with the segmentation
+//          needs of contracts 1.2); spell.cast, spell.fizzle and spell.pending (the decision on our
+//          stroke); replay.state and voice.status; settings filter.*, segmenter.*, playArea and
+//          engine.mode.
 // Outputs: tip.filtered (every sample, at once, same t and src), segmenter.state, stroke.begin,
 //          stroke.end.
 // Requests handled: segmenter.pause, segmenter.capture.
@@ -25,7 +26,8 @@ export const MANIFEST: ModuleManifest = {
   kind: 'segmenter',
   title: 'Filter and segmenter',
   version: '1.0.0',
-  contract: '^1.1',
+  // 1.2: reads TrackerStatus.segmentation.
+  contract: '^1.2',
   provides: ['stroke.source'],
   requires: [],
 };

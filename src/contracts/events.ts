@@ -2,6 +2,7 @@
 //
 // Every event type in version 1, with its payload. Section 6 lists the 1.0 set; 1.1 adds the
 // rest. All payloads are version 1 (Envelope.v = 1). Readers ignore event types they do not know.
+// Fields added in 1.2 are marked `@since 1.2`.
 //
 // TIP EVENT RULES (1.1), followed by every tracker and expected by every consumer:
 //  1. After start(), a tracker publishes 'tracker.status' (with aspect and pen) before any tip event,
@@ -13,7 +14,10 @@
 //     t of the last sample. A tracker holding the tip publishes 'tip.lost' when it stops, when the
 //     camera stops, and before a camera generation changes.
 //  4. Consumers must not rely on 'tip.lost' alone: a gap in sample capture times longer than
-//     'segmenter.lostMs' also means the tip is gone.
+//     'segmenter.lostMs' also means the tip is gone. @since 1.2: for a tracker whose status asks for
+//     a longer gap (TrackerStatus.segmentation.lostMs), the segmenter waits that long instead, and so
+//     does a consumer that judges the gap itself (the stage's tip), by the same rule
+//     (SegmentationNeeds), so the two never disagree about whether the tip is there.
 
 import type { Incantation, Recognition, RecognitionDetail, SpellCast, SpellEnded, SpellFizzle, Stroke, TipSample, FizzleReason } from './v1';
 import type { ModuleKind, ModuleState } from './module';
@@ -50,9 +54,39 @@ export interface TrackerStatus {
   /** A plain sentence for the status area, e.g. 'Hand model loading'. */
   message?: string;
   /** Camera trackers only: set 3 s after start() or after the last confident sample, cleared when
-   *  the tip is found and on stop() (Section 7.9). Pointer trackers never set it. */
-  hint?: 'tip-not-found' | 'hand-not-found' | 'too-many-lights' | null;
+   *  the tip is found and on stop() (Section 7.9). Pointer trackers never set it.
+   *  @since 1.2 'hand-too-small' (the hand tracker): the hand is found but small in the frame, its
+   *  median TipSample.size over the last second under 0.05, where detection starts to fail; cleared
+   *  at 0.055 or more. It is decided on the frames with a hand and lasts while the last second holds
+   *  any, so a short loss of the tip does not clear it; it clears on stop() and with a new camera. */
+  hint?: 'tip-not-found' | 'hand-not-found' | 'too-many-lights' | 'hand-too-small' | null;
+  /** @since 1.2 What this tracker's samples need from the segmenter (SegmentationNeeds). */
+  segmentation?: SegmentationNeeds;
 }
+
+/**
+ * @since 1.2 Segmenter rules a tracker's samples need, where they must be more forgiving than the
+ * settings: a tracker whose detection misses runs of frames, or runs at a low frame rate, says so here.
+ * The segmenter keeps it per tracker, with the aspect and pen flag, and for that tracker's samples
+ * only uses the more forgiving of the two in each case; a setting that is more forgiving still wins:
+ *  - lostMs: the tip counts as gone after max(segmenter.lostMs, lostMs) without samples (rule 4);
+ *  - minSamples: a stroke needs min(segmenter.minSamples, minSamples) samples, the tracker's value
+ *    counted as at least 3;
+ *  - pauseMs: a pause of max(segmenter.pauseMs, pauseMs) ends a stroke.
+ * The segmenter ignores a value that is not a finite number of zero or more (the other values still
+ * count), and holds lostMs and pauseMs to 2 s (SEGMENTATION_NEED_MAX_MS, the segmenter's MAX_NEED_MS),
+ * so a wrong status cannot keep a tip in view, or a stroke open, for long after its samples stop or
+ * still. A consumer that applies lostMs itself (rule 4) reads it the same way.
+ * Every tracker.status carries the whole set: a status without it means the tracker needs nothing.
+ */
+export interface SegmentationNeeds {
+  lostMs?: number;
+  minSamples?: number;
+  pauseMs?: number;
+}
+
+/** @since 1.2 The longest lostMs or pauseMs that SegmentationNeeds can ask for: longer ones count as this. */
+export const SEGMENTATION_NEED_MAX_MS = 2000;
 
 /** What the tracker sees, for the Wand tuning screen. Published only while 'tracker.debug' is on, at
  *  about 10 fps. The image is already in caster orientation (mirrored) and stays valid until the next

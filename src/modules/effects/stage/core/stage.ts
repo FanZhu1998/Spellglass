@@ -14,8 +14,9 @@ import type {
   Anchor, CameraReady, CameraStatus, EffectEvent, Kernel, Module, ModuleManifest, Point, PracticeAttempt, PracticeFocus,
   PracticeGuide as PracticeGuideEvent, RecognitionDetail, RequestPayload, RequestResult, SceneProps, SegmenterStatus,
   SpellbookEntry, SpellCast, SpellEnded, SpellFizzle, Spellbook, SpellPending, StageSurface, Stroke, ThemePack, TipSample,
+  TrackerStatus,
 } from '../../../../contracts';
-import { CAST_SEQUENCE, EFFECT_LIMITS } from '../../../../contracts';
+import { CAST_SEQUENCE, EFFECT_LIMITS, SEGMENTATION_NEED_MAX_MS } from '../../../../contracts';
 import {
   ask, describeError, emit, gesturePaceMs, geometry, KernelError, lastPayload, logger, newId, on, serve, setting,
   watchReducedMotion, watchSettings,
@@ -130,7 +131,17 @@ export class StageCore implements StageWorld {
   private quality: StageQuality = 'auto';
   private adaptiveLow = false;
   private drawCost = 0;
+  /** How long the tip on the glass may go without a sample before it counts as gone (tip event rule 4):
+   *  the segmenter's own figure for the tracker whose samples these are, the setting or that tracker's
+   *  longer need (updateLostMs). So through a dropout the segmenter bridges, the stroke goes on and so
+   *  do the tip's glow and liveTip(), which a steered prop follows. */
   private lostMs = 200;
+  /** segmenter.lostMs, the setting. */
+  private lostSetting = 200;
+  /** Each tracker's lostMs need from its latest tracker.status (contracts 1.2 SegmentationNeeds). */
+  private readonly lostNeeds = new Map<string, number>();
+  /** Tracker of the tip on the glass: TipSample.src of the latest tip.filtered. */
+  private tipSrc: string | null = null;
   private flipX = true;
   private candleColor = DEFAULT_CANDLE;
   private vellumColor = DEFAULT_VELLUM;
@@ -232,6 +243,10 @@ export class StageCore implements StageWorld {
     this.text.ensureFont(undefined);
     const book = lastPayload(k, 'spellbook.changed');
     if (book) this.onSpellbook(book);
+    // Trackers may have reported before the stage ran; later statuses come through subscribe().
+    this.lostNeeds.clear();
+    const status = lastPayload(k, 'tracker.status');
+    if (status) this.onTrackerStatus(status);
     this.subscribe(k);
     const focus = lastPayload(k, 'practice.focus');
     if (focus) this.onFocus(focus);
@@ -367,6 +382,7 @@ export class StageCore implements StageWorld {
     this.subs.push(
       on(k, 'tip.filtered', (s) => this.onTip(s)),
       on(k, 'tip.lost', () => this.tip.lost(this.now())),
+      on(k, 'tracker.status', (s) => this.onTrackerStatus(s)),
       on(k, 'segmenter.state', (s) => this.onSegmenter(s)),
       on(k, 'stroke.begin', (s) => this.onStrokeBegin(s)),
       on(k, 'stroke.end', (s) => this.onStrokeEnd(s)),
@@ -396,7 +412,8 @@ export class StageCore implements StageWorld {
     const q = setting(k, 'stage.quality');
     this.quality = q === 'high' || q === 'low' ? q : 'auto';
     const lost = setting(k, 'segmenter.lostMs');
-    this.lostMs = typeof lost === 'number' && lost > 0 ? lost : 200;
+    this.lostSetting = typeof lost === 'number' && lost > 0 ? lost : 200;
+    this.updateLostMs();
     this.flipX = setting(k, 'capture.flipX') !== false;
     this.applyTheme();
     this.applyVideo();
@@ -406,8 +423,31 @@ export class StageCore implements StageWorld {
     this.publishSurface();
   }
 
+  /** tracker.status: the tracker's lostMs need, kept per tracker (tip event rule 1) and read as the
+   *  segmenter reads it (contracts/events.ts SegmentationNeeds): a value that is not a finite number of
+   *  zero or more counts as none, and a longer one as SEGMENTATION_NEED_MAX_MS. */
+  private onTrackerStatus(s: TrackerStatus): void {
+    if (!s || typeof s.tracker !== 'string') return;
+    const need: unknown = s.segmentation?.lostMs;
+    if (typeof need === 'number' && Number.isFinite(need) && need >= 0) this.lostNeeds.set(s.tracker, Math.min(need, SEGMENTATION_NEED_MAX_MS));
+    else this.lostNeeds.delete(s.tracker);
+    if (s.tracker === this.tipSrc) this.updateLostMs();
+  }
+
+  /** lostMs for the tip on the glass, as the segmenter has it for the same samples: the setting, or the
+   *  tracker's longer need. */
+  private updateLostMs(): void {
+    const need = this.tipSrc === null ? undefined : this.lostNeeds.get(this.tipSrc);
+    this.lostMs = need === undefined ? this.lostSetting : Math.max(this.lostSetting, need);
+  }
+
   private onTip(s: TipSample): void {
     const now = this.now();
+    const src = typeof s.src === 'string' ? s.src : null;
+    if (src !== this.tipSrc) {
+      this.tipSrc = src;
+      this.updateLostMs();
+    }
     this.tip.sample(s, now);
     // Replays ignore live input; while something steers, the tip moves it and leaves no ink.
     if (this.replaySession || this.steeringCastId || this.seg?.state !== 'tracing') return;

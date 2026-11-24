@@ -132,6 +132,8 @@ On Windows, run the tests through npm (or `node tools/run-vitest.mjs`): Vitest s
 
 The end-to-end tests run Chrome with `--disable-gpu`. Headless Chrome draws through a software GPU that compiles its shaders the first time the stage uses a canvas effect, which holds input back for several seconds on the first press; the tests check what the app does, not how the GPU draws it.
 
+The desktop tests also start the app with the switches that keep Chromium drawing a covered window (`KEEP_DRAWING` in `tests/desktop/app.ts`), as Playwright does for the browsers it starts. Chromium stops drawing a window that something covers, and the camera's frames stop with it; a window the tests open on a CI Mac may be covered. A player is looking at the window, so this changes nothing for them.
+
 ## How it is built
 
 The app is a pipeline of small modules around an event bus (blueprint Section 5):

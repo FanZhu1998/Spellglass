@@ -10,8 +10,8 @@ import { expect, test, type ElectronApplication, type Page } from '@playwright/t
 import { writeY4m } from '../../tools/fake-camera/make-y4m';
 import { MOUSE, NO_GPU, casts, draw, seen, waitForCasts } from '../e2e/helpers';
 import {
-  NETWORK_USE, OUTPUT, ROOT, appArgs, closeStarted, closeWindowOf, electronEnv, launch, netLogEvents, pageStarted, portableExe, prepare, refused,
-  releaseApp, removeTempDirs, spellglassWindows, start, tempDir, testBuildApp,
+  NETWORK_USE, OUTPUT, ROOT, appArgs, closeStarted, closeWindowOf, diagnose, electronEnv, explained, launch, netLogEvents, pageStarted, portableExe,
+  prepare, refused, releaseApp, removeTempDirs, spellglassWindows, start, tempDir, testBuildApp,
 } from './app';
 
 // Each test starts an app of its own, with a user data folder of its own: one that fails does not stop
@@ -131,7 +131,8 @@ test('uses no network at all, from its first moment: no lookup, no socket, no pr
 
 test('keeps the page to its own origin: requests, navigation, windows and permissions', async () => {
   // Fake devices but the real prompts, so every media request reaches the main process's handler.
-  const { app, page } = await launch({ userData: tempDir('spellglass-desktop-'), extraArgs: ['--use-fake-device-for-media-stream'] });
+  const launched = await launch({ userData: tempDir('spellglass-desktop-'), extraArgs: ['--use-fake-device-for-media-stream'] });
+  const { app, page } = launched;
   try {
     // The main process refuses a request off the origin even when no page policy stands in the way.
     const load = await app.evaluate(async ({ BrowserWindow }) => {
@@ -292,32 +293,35 @@ test('keeps the page to its own origin: requests, navigation, windows and permis
     }
 
     const fullScreen = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isFullScreen());
-    // An element of the page may go full screen (the request needs a click, as in a browser), and
-    // the request settles rather than hanging.
-    const html = await app.evaluate(async ({ BrowserWindow }) => {
-      const contents = BrowserWindow.getAllWindows()[0].webContents;
-      const run = (code: string) => contents.executeJavaScript(code, true);
-      const settle = (promise: string) => `Promise.race([${promise}, new Promise((r) => setTimeout(() => r('still waiting'), 5000))])`;
-      const entered = await run(settle(`document.documentElement.requestFullscreen().then(() => 'entered', (e) => 'refused: ' + e.message)`));
-      const element = await run('document.fullscreenElement === document.documentElement');
-      const left = await run(settle(`document.exitFullscreen().then(() => 'left', (e) => 'stuck: ' + e.message)`));
-      return { entered, element, left };
-    });
-    expect(html).toEqual({ entered: 'entered', element: true, left: 'left' });
-    await expect.poll(fullScreen).toBe(false);
-
-    // F11 toggles full screen. (Sent as the system would send it: Playwright's own key presses skip
-    // the main process.)
-    const f11 = () =>
-      app.evaluate(({ BrowserWindow }) => {
+    await explained(launched, async () => {
+      // An element of the page may go full screen (the request needs a click, as in a browser), and
+      // the request settles rather than hanging. (On a Mac each change is an animation of its own,
+      // and one asked for during another waits for it to end.)
+      const html = await app.evaluate(async ({ BrowserWindow }) => {
         const contents = BrowserWindow.getAllWindows()[0].webContents;
-        contents.sendInputEvent({ type: 'keyDown', keyCode: 'F11' });
-        contents.sendInputEvent({ type: 'keyUp', keyCode: 'F11' });
+        const run = (code: string) => contents.executeJavaScript(code, true);
+        const settle = (promise: string) => `Promise.race([${promise}, new Promise((r) => setTimeout(() => r('still waiting'), 10000))])`;
+        const entered = await run(settle(`document.documentElement.requestFullscreen().then(() => 'entered', (e) => 'refused: ' + e.message)`));
+        const element = await run('document.fullscreenElement === document.documentElement');
+        const left = await run(settle(`document.exitFullscreen().then(() => 'left', (e) => 'stuck: ' + e.message)`));
+        return { entered, element, left };
       });
-    await f11();
-    await expect.poll(fullScreen).toBe(true);
-    await f11();
-    await expect.poll(fullScreen).toBe(false);
+      expect(html).toEqual({ entered: 'entered', element: true, left: 'left' });
+      await expect.poll(fullScreen).toBe(false);
+
+      // F11 toggles full screen. (Sent as the system would send it: Playwright's own key presses skip
+      // the main process.)
+      const f11 = () =>
+        app.evaluate(({ BrowserWindow }) => {
+          const contents = BrowserWindow.getAllWindows()[0].webContents;
+          contents.sendInputEvent({ type: 'keyDown', keyCode: 'F11' });
+          contents.sendInputEvent({ type: 'keyUp', keyCode: 'F11' });
+        });
+      await f11();
+      await expect.poll(fullScreen).toBe(true);
+      await f11();
+      await expect.poll(fullScreen).toBe(false);
+    });
   } finally {
     await closeApp(app);
   }
@@ -454,17 +458,20 @@ test('the bright tip follows a fake camera and casts (routes A and C)', async ()
   const dir = tempDir('spellglass-desktop-clip-');
   const clip = join(dir, 'clip.y4m');
   writeY4m(clip, { width: 640, height: 360 });
-  const { app, page } = await launch({ userData: tempDir('spellglass-desktop-'), fakeCamera: clip });
+  const launched = await launch({ userData: tempDir('spellglass-desktop-'), fakeCamera: clip });
+  const { app, page } = launched;
   try {
     const errors = watchErrors(page);
     await prepare(page, { 'spells.unlockAll': true, 'app.onboarded': true, 'capture.consent': true, 'capture.mirror': true, 'tracker.active': 'tracker.bright-tip' });
-    await page.waitForFunction(
-      () => ((window as any).__seen as { type: string; p: any }[]).some((e) => e.type === 'camera.status' && e.p.state === 'on'),
-      null,
-      { timeout: 30_000 },
+    await explained(launched, () =>
+      page.waitForFunction(
+        () => ((window as any).__seen as { type: string; p: any }[]).some((e) => e.type === 'camera.status' && e.p.state === 'on'),
+        null,
+        { timeout: 30_000 },
+      ),
     );
     // The clip traces Lumos, Wingardium Leviosa, Protego and Stupefy, and Chrome loops it.
-    await waitForCasts(page, ['lumos', 'stupefy'], 120_000);
+    await explained(launched, () => waitForCasts(page, ['lumos', 'stupefy'], 120_000));
     const status = (await seen(page, 'tracker.status')).filter((e) => e.p.tracker === 'tracker.bright-tip').pop();
     expect(status?.p.state).not.toBe('error');
     expect((await refused(app)).requests).toEqual([]);
@@ -477,17 +484,20 @@ test('the bright tip follows a fake camera and casts (routes A and C)', async ()
 test('the hand tracker loads its model from the app and runs (route B)', async () => {
   test.setTimeout(150_000);
   test.skip(!existsSync(join(ROOT, 'dist', 'models', 'hand_landmarker.task')), 'No hand model in dist/models: run npm run models, then build.');
-  const { app, page } = await launch({ userData: tempDir('spellglass-desktop-'), fakeCamera: true });
+  const launched = await launch({ userData: tempDir('spellglass-desktop-'), fakeCamera: true });
+  const { app, page } = launched;
   try {
     const errors = watchErrors(page);
     const requests: string[] = [];
     page.on('request', (r) => requests.push(r.url()));
     await prepare(page, { 'app.onboarded': true, 'capture.consent': true, 'tracker.active': 'tracker.hand' });
     // Chrome's fake camera shows no hand, so the tracker searches: the model and its WebAssembly run.
-    await page.waitForFunction(
-      () => ((window as any).__seen as { type: string; p: any }[]).some((e) => e.type === 'tracker.status' && e.p.tracker === 'tracker.hand' && (e.p.state === 'searching' || e.p.state === 'tracking')),
-      null,
-      { timeout: 90_000 },
+    await explained(launched, () =>
+      page.waitForFunction(
+        () => ((window as any).__seen as { type: string; p: any }[]).some((e) => e.type === 'tracker.status' && e.p.tracker === 'tracker.hand' && (e.p.state === 'searching' || e.p.state === 'tracking')),
+        null,
+        { timeout: 90_000 },
+      ),
     );
     const states = (await seen(page, 'tracker.status')).filter((e) => e.p.tracker === 'tracker.hand').map((e) => e.p.state);
     expect(states).not.toContain('error');
@@ -639,4 +649,36 @@ test('the portable .exe: a second double-click hands over, and copies left behin
     }
     for (const dir of fakes) rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// A report for CI, not a check: how this system shows a window the tests start, as players get it
+// (Chromium slows a covered window down) and as the other tests run it (KEEP_DRAWING in app.ts), with
+// the camera's frames counted. It explains what fails on one system only; it fails only if the app
+// does not start.
+test('a report on how this system shows the window (CI only)', async () => {
+  test.skip(!process.env.CI, 'A report for CI runs.');
+  test.setTimeout(120_000);
+  const parts: string[] = [];
+  for (const throttled of [true, false]) {
+    const launched = await launch({ userData: tempDir('spellglass-desktop-report-'), fakeCamera: true, throttled });
+    try {
+      await prepare(launched.page, { 'app.onboarded': true, 'capture.consent': true, 'tracker.active': 'tracker.bright-tip' });
+      const frames = await launched.page.evaluate(async () => {
+        const { kernel } = (window as any).__spellglass;
+        const on = () => ((window as any).__seen as { type: string; p: any }[]).some((e) => e.type === 'camera.status' && e.p.state === 'on');
+        const t0 = performance.now();
+        while (!on() && performance.now() - t0 < 20_000) await new Promise((r) => setTimeout(r, 200));
+        let n = 0;
+        const off = kernel.subscribe('camera.frame', () => n++);
+        await new Promise((r) => setTimeout(r, 2000));
+        if (typeof off === 'function') off();
+        return n;
+      });
+      parts.push(`${throttled ? 'As players get it' : 'As the tests run it'}: ${frames} camera frames in 2 s.\n${await diagnose(launched)}`);
+    } finally {
+      await closeApp(launched.app);
+    }
+  }
+  const text = parts.join('\n\n');
+  console.log(`\n::notice title=How ${process.platform} shows the window::${text.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')}`);
 });

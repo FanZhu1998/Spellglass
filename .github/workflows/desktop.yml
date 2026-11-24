@@ -70,4 +70,6 @@ jobs:
         with:
           name: desktop-test-output-${{ matrix.name }}
           path: tests/desktop/.output
+          # .output starts with a dot, which upload-artifact leaves out unless told otherwise.
+          include-hidden-files: true
           retention-days: 7

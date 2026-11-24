@@ -61,6 +61,14 @@ export function closeWindowOf(pid: number): void {
   execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `[void](Get-Process -Id ${pid}).CloseMainWindow()`]);
 }
 
+/**
+ * Chromium stops drawing a window that something covers: no animation frames, no video frame callbacks
+ * (which bring the camera's frames), and timers slowed to once a second. A test machine's window may
+ * well be covered (a Mac on CI is), so the tests switch that off, as Playwright does for the browsers
+ * it starts. A player looks at the window, and gets Chromium's own behaviour.
+ */
+export const KEEP_DRAWING = ['--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'];
+
 /** Electron must not inherit ELECTRON_RUN_AS_NODE (some editors set it): it would start as plain Node. */
 export function electronEnv(): Record<string, string> {
   const env: Record<string, string> = {};
@@ -77,19 +85,101 @@ export interface LaunchOptions {
   fakeCamera?: string | true;
   /** More switches, for Chromium (a net log, fake devices without the fake prompt). */
   extraArgs?: string[];
+  /** Leave out KEEP_DRAWING: Chromium slows a covered window down, as it does for players. */
+  throttled?: boolean;
 }
 
 /** The arguments the app is started with (also for a second instance started by hand). */
 export function appArgs(opts: LaunchOptions): string[] {
   const camera = opts.fakeCamera === true ? ['--spellglass-fake-camera'] : opts.fakeCamera ? [`--spellglass-fake-camera=${opts.fakeCamera}`] : [];
-  return [...(opts.executablePath ? [] : [ROOT]), `--spellglass-user-data=${opts.userData}`, ...NO_GPU, ...camera, ...(opts.extraArgs ?? [])];
+  return [
+    ...(opts.executablePath ? [] : [ROOT]), `--spellglass-user-data=${opts.userData}`, ...NO_GPU, ...(opts.throttled ? [] : KEEP_DRAWING), ...camera, ...(opts.extraArgs ?? []),
+  ];
 }
 
-export async function launch(opts: LaunchOptions): Promise<{ app: ElectronApplication; page: Page }> {
+/** An app the tests drive, with the last lines it and its page wrote (for diagnose()). */
+export interface Launched {
+  app: ElectronApplication;
+  page: Page;
+  /** The main process's output (Chromium's own messages included) and the page's console, oldest first. */
+  output: () => string[];
+}
+
+export async function launch(opts: LaunchOptions): Promise<Launched> {
   const app = await electron.launch({ executablePath: opts.executablePath, args: appArgs(opts), env: electronEnv(), cwd: ROOT, timeout: 60_000 });
+  const lines: string[] = [];
+  const keep = (from: string, text: string) => {
+    for (const line of text.split(/\r?\n/)) if (line.trim()) lines.push(`${from}: ${line.trim().slice(0, 300)}`);
+    if (lines.length > 400) lines.splice(0, lines.length - 400);
+  };
+  app.process().stdout?.on('data', (d) => keep('main', String(d)));
+  app.process().stderr?.on('data', (d) => keep('main', String(d)));
   const page = await app.firstWindow();
+  page.on('console', (m) => keep('page', `${m.type()} ${m.text()}`));
+  page.on('pageerror', (e) => keep('page', `uncaught ${e.message}`));
   await page.waitForFunction(() => !!(window as any).__spellglass, null, { timeout: 30_000 });
-  return { app, page };
+  return { app, page, output: () => [...lines] };
+}
+
+/**
+ * What the app was doing, for a test that failed: whether the page is shown and drawing, what the
+ * camera and the trackers said (from the events prepare() records), the modules' states, the main
+ * window, and the last lines of output. Never throws.
+ */
+export async function diagnose(launched: Launched): Promise<string> {
+  const { app, page } = launched;
+  const pageState = await page
+    .evaluate(async () => {
+      // Animation frames in one second (none when Chromium stopped drawing the page).
+      const frames = await new Promise<number>((resolve) => {
+        let n = 0;
+        const t0 = performance.now();
+        const step = () => {
+          n++;
+          if (performance.now() - t0 < 1000) requestAnimationFrame(step);
+          else resolve(n);
+        };
+        requestAnimationFrame(step);
+        setTimeout(() => resolve(n), 2000);
+      });
+      const seen = ((window as any).__seen ?? []) as { type: string; p: any }[];
+      const counts: Record<string, number> = {};
+      for (const e of seen) counts[e.type] = (counts[e.type] ?? 0) + 1;
+      // Each change of state once, in order.
+      const changes = (type: string, say: (p: any) => string) =>
+        seen.filter((e) => e.type === type).map((e) => say(e.p)).filter((s, i, all) => s !== all[i - 1]);
+      const { kernel } = (window as any).__spellglass ?? {};
+      return {
+        visibility: document.visibilityState,
+        focused: document.hasFocus(),
+        framesInASecond: frames,
+        events: counts,
+        camera: changes('camera.status', (p) => [p.state, p.width && `${p.width}x${p.height}`, p.fps && `${p.fps} fps`, p.message].filter(Boolean).join(' ')),
+        trackers: changes('tracker.status', (p) => [p.tracker, p.state, p.message].filter(Boolean).join(' ')),
+        recognitions: seen.filter((e) => e.type === 'recognition.result').slice(-3).map((e) => JSON.stringify(e.p).slice(0, 300)),
+        modules: kernel?.modules?.().map((m: any) => `${m.manifest.id} ${m.state}`),
+      };
+    })
+    .catch((err: unknown) => ({ unreadable: String(err) }));
+  const win = await app
+    .evaluate(({ BrowserWindow, screen }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x.webContents.getURL() === 'app://spellglass/');
+      if (!w) return 'no main window';
+      const display = screen.getDisplayMatching(w.getBounds());
+      return { visible: w.isVisible(), focused: w.isFocused(), minimized: w.isMinimized(), fullScreen: w.isFullScreen(), bounds: w.getBounds(), workArea: display.workArea };
+    })
+    .catch((err: unknown) => String(err));
+  return JSON.stringify({ page: pageState, window: win, output: launched.output().slice(-40) }, null, 1);
+}
+
+/** Run `step`; should it fail, its error carries diagnose()'s account of the app. */
+export async function explained<T>(launched: Launched, step: () => Promise<T>): Promise<T> {
+  try {
+    return await step();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`${message}\n\nWhat the app was doing:\n${await diagnose(launched)}`, { cause: err });
+  }
 }
 
 /** Apply settings through the kernel and record pipeline events, as the e2e helpers' boot() does. */

@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "userdata-1.json",
+  "title": "Spellglass saved data export, format spellglass-data/1",
+  "description": "'Export my data' writes one JSON file in this format: the player's changed settings and the records of each store (blueprint Section 9.4; TypeScript shape in src/contracts/storage.ts UserDataExport). The envelope is checked here; each record carries its own dataVersion and is migrated by the storage module on import, so records are not checked against the definitions below, which describe dataVersion 1 records for reference. Store names other than those of version 1 are allowed and ignored by readers.",
+  "type": "object",
+  "required": ["schema", "dataVersion", "settingsVersion", "exportedAt", "settings", "stores"],
+  "properties": {
+    "schema": { "type": "string", "const": "spellglass-data/1" },
+    "dataVersion": { "type": "integer", "minimum": 1 },
+    "settingsVersion": { "type": "integer", "minimum": 1 },
+    "exportedAt": { "type": "string", "maxLength": 64 },
+    "settings": {
+      "description": "Only the values the player changed, so defaults are never pinned.",
+      "type": "object"
+    },
+    "stores": {
+      "type": "object",
+      "maxProperties": 32,
+      "propertyNames": { "$ref": "common-1.json#/definitions/token" },
+      "additionalProperties": {
+        "type": "array",
+        "items": { "$ref": "#/definitions/record" }
+      }
+    }
+  },
+  "definitions": {
+    "record": {
+      "type": "object",
+      "required": ["key", "value"],
+      "properties": {
+        "key": { "type": "string", "maxLength": 256 },
+        "value": true
+      }
+    },
+    "spellProgress": {
+      "description": "Store 'progress', by spell id.",
+      "type": "object",
+      "required": ["dataVersion", "spellId", "casts", "practiceAttempts", "best", "learnedAt"],
+      "properties": {
+        "dataVersion": { "type": "integer", "minimum": 1 },
+        "spellId": { "$ref": "common-1.json#/definitions/id" },
+        "casts": { "type": "integer", "minimum": 0 },
+        "practiceAttempts": { "type": "integer", "minimum": 0 },
+        "best": { "$ref": "common-1.json#/definitions/fraction" },
+        "learnedAt": { "type": ["number", "null"] }
+      }
+    },
+    "gestureOverride": {
+      "description": "Store 'overrides', by spell id: a gesture the player redrew, stored right-handed.",
+      "type": "object",
+      "required": ["dataVersion", "spellId", "gesture", "savedAt"],
+      "properties": {
+        "dataVersion": { "type": "integer", "minimum": 1 },
+        "spellId": { "$ref": "common-1.json#/definitions/id" },
+        "gesture": { "$ref": "common-1.json#/definitions/gesture" },
+        "drawnLeftHanded": { "type": "boolean" },
+        "savedAt": { "type": "number" }
+      }
+    },
+    "userPack": {
+      "description": "Store 'packs', by pack id: a spell, theme or gesture pack the player imported, kept exactly as imported (it is migrated each time it loads).",
+      "type": "object",
+      "required": ["dataVersion", "id", "json", "importedAt"],
+      "properties": {
+        "dataVersion": { "type": "integer", "minimum": 1 },
+        "id": { "$ref": "common-1.json#/definitions/id" },
+        "json": { "type": "object" },
+        "importedAt": { "type": "number" }
+      }
+    },
+    "gestureSample": {
+      "description": "Store 'samples', by id: an accepted stroke kept as an extra template (Section 7.5).",
+      "type": "object",
+      "required": ["dataVersion", "id", "spellId", "points", "score", "savedAt"],
+      "properties": {
+        "dataVersion": { "type": "integer", "minimum": 1 },
+        "id": { "type": "string", "maxLength": 128 },
+        "spellId": { "$ref": "common-1.json#/definitions/id" },
+        "points": { "$ref": "common-1.json#/definitions/path" },
+        "score": { "$ref": "common-1.json#/definitions/fraction" },
+        "gestureKey": { "type": "string", "maxLength": 64 },
+        "savedAt": { "type": "number" }
+      }
+    },
+    "kvUnlockedTier": {
+      "description": "Store 'kv', key 'progress.unlockedTier': the highest tier the player has opened (staged unlocking).",
+      "type": "object",
+      "required": ["dataVersion", "value"],
+      "properties": {
+        "dataVersion": { "type": "integer", "minimum": 1 },
+        "value": { "$ref": "common-1.json#/definitions/tier" }
+      }
+    }
+  }
+}

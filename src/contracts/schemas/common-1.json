@@ -1,0 +1,245 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "common-1.json",
+  "title": "Spellglass shared definitions, version 1",
+  "description": "Building blocks the pack, session and data schemas share. These files are the source of truth (blueprint Section 12): the app validates with code generated from them by tools/gen-validators.mjs, and any JSON Schema draft-07 tool can use them directly. Each $id is the file's own name, so relative $refs resolve to sibling files. Readers are tolerant (Section 9.1 rule 3): no schema here forbids unknown properties; they check required fields, types, id patterns, point shapes and sizes.",
+  "definitions": {
+    "id": {
+      "description": "A permanent id (Section 9.1 rule 1): lower-case letters and digits in words joined by single hyphens, such as core-charms or wingardium-leviosa.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "version": {
+      "description": "A semantic version: major.minor.patch, with an optional pre-release or build suffix.",
+      "type": "string",
+      "maxLength": 32,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$"
+    },
+    "range": {
+      "description": "A version range such as '>=1.0 <2.0', '^1.0' or '1.x' (src/kernel/semver.ts).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[0-9A-Za-z.*^~<>=| -]+$"
+    },
+    "capability": {
+      "description": "A capability name with an optional version, such as fx.light@1 or audio@1 (Section 9.1 rule 5).",
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9-]*(\\.[a-z0-9-]+)*(@[1-9][0-9]*)?$"
+    },
+    "capabilities": {
+      "type": "array",
+      "maxItems": 32,
+      "items": { "$ref": "#/definitions/capability" }
+    },
+    "idList": {
+      "type": "array",
+      "maxItems": 64,
+      "items": { "$ref": "#/definitions/id" }
+    },
+    "token": {
+      "description": "A short lower-case name: an audio cue, a particle preset, a mode, a token key.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,31}$"
+    },
+    "tag": {
+      "description": "A dotted lower-case tag, such as prop.lockable.",
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9-]*(\\.[a-z0-9-]+)*$"
+    },
+    "color": {
+      "description": "A CSS hex color: #rgb, #rrggbb or #rrggbbaa.",
+      "type": "string",
+      "pattern": "^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$"
+    },
+    "fontName": {
+      "description": "A font family name: letters, digits, spaces and hyphens.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9 -]{1,64}$"
+    },
+    "fraction": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "milliseconds": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 600000
+    },
+    "coordinate": {
+      "description": "One coordinate of a unit-square point. The square is 0 to 1; a little overshoot is allowed for hand-drawn paths.",
+      "type": "number",
+      "minimum": -0.5,
+      "maximum": 1.5
+    },
+    "point": {
+      "description": "[x, y] in an isotropic unit square as seen in the mirror: x left to right, y top to bottom (contracts/packs.ts Point).",
+      "type": "array",
+      "minItems": 2,
+      "items": [{ "$ref": "#/definitions/coordinate" }, { "$ref": "#/definitions/coordinate" }],
+      "additionalItems": false
+    },
+    "path": {
+      "description": "A traced path: at least 2 points, in drawing order.",
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 256,
+      "items": { "$ref": "#/definitions/point" }
+    },
+    "flickDirection": {
+      "type": "string",
+      "enum": ["up", "down", "left", "right"]
+    },
+    "gesturePart": {
+      "description": "A named part of a gesture, used to phrase hints. until is the end of the part as a fraction of the path's length.",
+      "type": "object",
+      "required": ["until", "name"],
+      "properties": {
+        "until": { "$ref": "#/definitions/fraction" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "short_hint": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "stray_hint": { "type": "string", "minLength": 1, "maxLength": 200 }
+      }
+    },
+    "gesture": {
+      "description": "A spell's gesture: exactly one of flick (a straight flick), path (one path, Appendix B form) or paths (several templates, Section 9.2 form).",
+      "type": "object",
+      "properties": {
+        "flick": { "$ref": "#/definitions/flickDirection" },
+        "path": { "$ref": "#/definitions/path" },
+        "paths": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": { "$ref": "#/definitions/path" }
+        },
+        "any_start": { "type": "boolean" },
+        "start_points": { "type": "integer", "minimum": 1, "maximum": 32 },
+        "parts": {
+          "type": "array",
+          "maxItems": 16,
+          "items": { "$ref": "#/definitions/gesturePart" }
+        },
+        "pace_ms": { "type": "number", "exclusiveMinimum": 0, "maximum": 30000 }
+      },
+      "oneOf": [
+        { "required": ["flick"], "properties": { "flick": true } },
+        { "required": ["path"], "properties": { "path": true } },
+        { "required": ["paths"], "properties": { "paths": true } }
+      ]
+    },
+    "anchor": {
+      "description": "Where an effect step happens: tip, aim, target, center or caster in version 1. Other names are allowed so newer packs still load; effect modules treat a name they do not know as aim.",
+      "$ref": "#/definitions/token"
+    },
+    "effectStep": {
+      "description": "One step of an effect, naming a primitive from contracts/effects.ts in use. Steps whose use no module implements are skipped (Section 9.1 rule 3). Known parameters are type-checked with generous bounds; EFFECT_LIMITS clamp them at run time, and pack lint warns about values beyond those limits. Unknown parameters are kept and ignored.",
+      "type": "object",
+      "required": ["use"],
+      "properties": {
+        "use": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9-]*(\\.[a-z0-9-]+)+$"
+        },
+        "at": { "$ref": "#/definitions/anchor" },
+        "from": { "$ref": "#/definitions/anchor" },
+        "to": { "$ref": "#/definitions/anchor" },
+        "delay_ms": { "type": "number", "minimum": 0, "maximum": 60000 },
+        "duration_ms": { "$ref": "#/definitions/milliseconds" },
+        "fade_ms": { "$ref": "#/definitions/milliseconds" },
+        "life_ms": { "$ref": "#/definitions/milliseconds" },
+        "hold_ms": { "$ref": "#/definitions/milliseconds" },
+        "hold": { "type": "boolean" },
+        "color": { "$ref": "#/definitions/color" },
+        "tint": { "$ref": "#/definitions/color" },
+        "cue": { "$ref": "#/definitions/token" },
+        "preset": { "$ref": "#/definitions/token" },
+        "kind": { "$ref": "#/definitions/token" },
+        "costume": { "$ref": "#/definitions/token" },
+        "mode": { "$ref": "#/definitions/token" },
+        "scope": { "$ref": "#/definitions/token" },
+        "style": { "$ref": "#/definitions/token" },
+        "direction": { "$ref": "#/definitions/token" },
+        "spell": { "$ref": "#/definitions/id" },
+        "text": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "amount": { "$ref": "#/definitions/fraction" },
+        "intensity": { "$ref": "#/definitions/fraction" },
+        "radius": { "type": "number", "minimum": 0, "maximum": 2 },
+        "height": { "type": "number", "minimum": 0, "maximum": 2 },
+        "distance": { "type": "number", "minimum": 0, "maximum": 2 },
+        "speed": { "type": "number", "minimum": 0, "maximum": 10 },
+        "factor": { "type": "number", "minimum": 0, "maximum": 10 },
+        "width": { "type": "number", "minimum": 0, "maximum": 10 },
+        "gain": { "type": "number", "minimum": 0, "maximum": 4 },
+        "detune": { "type": "number", "minimum": -4800, "maximum": 4800 },
+        "arc": { "type": "number", "minimum": -2, "maximum": 2 },
+        "count": { "type": "number", "minimum": 0, "maximum": 10000 },
+        "rate": { "type": "number", "minimum": 0, "maximum": 10000 },
+        "spread_deg": { "type": "number", "minimum": 0, "maximum": 360 },
+        "smoke": { "type": "boolean" },
+        "follow_tip": { "type": "boolean" },
+        "all": { "type": "boolean" },
+        "topple": { "type": "boolean" },
+        "jagged": { "type": "boolean" },
+        "to_stop": { "type": "boolean" }
+      }
+    },
+    "effectSteps": {
+      "type": "array",
+      "maxItems": 32,
+      "items": { "$ref": "#/definitions/effectStep" }
+    },
+    "effect": {
+      "description": "A spell's effect: steps built from primitives, and a built-in fallback ('sparkle') for when none can run.",
+      "type": "object",
+      "required": ["steps"],
+      "properties": {
+        "steps": { "$ref": "#/definitions/effectSteps" },
+        "fallback": { "$ref": "#/definitions/token" }
+      }
+    },
+    "variant": {
+      "description": "A pack variant, such as Lumos Maxima above power 0.8.",
+      "type": "object",
+      "required": ["when", "label"],
+      "properties": {
+        "when": {
+          "type": "object",
+          "properties": {
+            "power_min": { "$ref": "#/definitions/fraction" },
+            "power_max": { "$ref": "#/definitions/fraction" },
+            "quality_min": { "$ref": "#/definitions/fraction" }
+          }
+        },
+        "label": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "effect_scale": { "type": "number", "exclusiveMinimum": 0, "maximum": 10 }
+      }
+    },
+    "spellRefs": {
+      "description": "Spell ids, or '*' for every active spell (ends).",
+      "type": "array",
+      "maxItems": 64,
+      "items": { "type": "string", "maxLength": 64, "pattern": "^(\\*|[a-z0-9]+(-[a-z0-9]+)*)$" }
+    },
+    "targets": {
+      "description": "Prop tags a spell acts on, in order of preference (contracts/scene.ts PROP_TAGS).",
+      "type": "array",
+      "maxItems": 16,
+      "items": { "$ref": "#/definitions/tag" }
+    },
+    "tier": {
+      "description": "Unlock stage, 1 first (staged unlocking, Section 8). Absent means 1.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 99
+    },
+    "shortText": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "longText": { "type": "string", "maxLength": 500 }
+  }
+}

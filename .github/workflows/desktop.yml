@@ -1,0 +1,70 @@
+# Builds the desktop app (README, "Desktop app") on Windows and on macOS: the portable .exe and the
+# installer, and the .dmg and the .zip of Spellglass.app. Nothing is published and nothing is signed
+# with a certificate yet (the Mac app is signed ad hoc): the files are kept as the run's artifacts.
+#
+# Repository variable SPELLGLASS_WEB_URL (Settings > Secrets and variables > Actions > Variables), when
+# set to the web version's address, gives the desktop app its QR code and replay links.
+name: Desktop app
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            script: desktop:win
+            files: |
+              release/*.exe
+          - name: macOS
+            os: macos-latest
+            script: desktop:mac
+            files: |
+              release/*.dmg
+              release/*.zip
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      SPELLGLASS_WEB_URL: ${{ vars.SPELLGLASS_WEB_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # The hand-tracking model and its WASM runtime are fetched, not committed; the app carries them.
+      - run: npm run models
+      - run: npm run check
+      - run: npm run ${{ matrix.script }}
+      # Electron for the tests (npm ci leaves its download to first use), then the app in Electron:
+      # from dist/ and as packaged above.
+      - run: node node_modules/electron/install.js
+      - run: npx playwright test -c tests/desktop/playwright.config.ts
+      # Only a build that passed its tests is handed out.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Spellglass-${{ matrix.name }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: desktop-test-output-${{ matrix.name }}
+          path: tests/desktop/.output
+          retention-days: 7

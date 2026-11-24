@@ -1,0 +1,216 @@
+{
+  "schema": "spellpack/1",
+  "id": "restricted-section",
+  "version": "1.0.0",
+  "engine": ">=1.0 <2.0",
+  "title": "Restricted section",
+  "description": "The three Unforgivable Curses, drawn as abstract light and sound on the wooden dummy.",
+  "notice": "Off by default. These are well known from the stories, so they are here, kept apart. Every effect is abstract and lands only on the training dummy.",
+  "default_enabled": false,
+  "needs": [
+    "fx.light@1",
+    "fx.particles@1",
+    "fx.props@1",
+    "fx.shapes@1",
+    "audio@1"
+  ],
+  "spells": [
+    {
+      "id": "imperio",
+      "incantation": "Imperio",
+      "known_as": "The Imperius Curse",
+      "gesture_text": "An upright figure-eight from the top.",
+      "description": "The dummy copies your wand's movement.",
+      "basis": "app",
+      "heard_as": [
+        "imperial",
+        "im pear io",
+        "empirio",
+        "imperia",
+        "imperio"
+      ],
+      "gesture": {
+        "path": [[0.5, 0.05], [0.62, 0.07], [0.73, 0.13], [0.73, 0.25], [0.66, 0.35], [0.57, 0.44], [0.48, 0.52], [0.38, 0.61], [0.3, 0.7], [0.25, 0.81], [0.32, 0.91], [0.44, 0.95], [0.56, 0.95], [0.68, 0.91], [0.75, 0.81], [0.7, 0.7], [0.62, 0.61], [0.52, 0.52], [0.43, 0.44], [0.34, 0.35], [0.27, 0.25], [0.27, 0.13], [0.38, 0.07], [0.5, 0.05]],
+        "parts": [
+          {
+            "until": 0.521,
+            "name": "the lower loop"
+          },
+          {
+            "until": 1,
+            "name": "the upper loop",
+            "short_hint": "The upper loop stopped short: close the figure-eight at the top."
+          }
+        ]
+      },
+      "targets": [
+        "prop.dummy"
+      ],
+      "effect": {
+        "steps": [
+          {
+            "use": "prop.mimic",
+            "duration_ms": 5000
+          },
+          {
+            "use": "particles.burst",
+            "preset": "mist",
+            "at": "target",
+            "count": 24,
+            "color": "#C9B6FF"
+          },
+          {
+            "use": "audio.cue",
+            "cue": "curse-hum"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "duration_ms": 5000,
+      "ended_by": [
+        "finite-incantatem"
+      ],
+      "tier": 7
+    },
+    {
+      "id": "crucio",
+      "incantation": "Crucio",
+      "known_as": "The Cruciatus Curse",
+      "gesture_text": "A five-point star from the top.",
+      "description": "A red crackle; the dummy recoils.",
+      "basis": "app",
+      "heard_as": [
+        "crew see oh",
+        "crucial",
+        "kruschio",
+        "crusio",
+        "crucio"
+      ],
+      "gesture": {
+        "path": [[0.5, 0.02], [0.56, 0.21], [0.62, 0.4], [0.68, 0.59], [0.75, 0.78], [0.72, 0.84], [0.56, 0.72], [0.4, 0.61], [0.24, 0.49], [0.08, 0.38], [0.2, 0.35], [0.4, 0.35], [0.6, 0.35], [0.8, 0.35], [0.92, 0.38], [0.76, 0.49], [0.6, 0.61], [0.44, 0.72], [0.28, 0.84], [0.25, 0.78], [0.32, 0.59], [0.38, 0.4], [0.44, 0.21], [0.5, 0.02]],
+        "parts": [
+          {
+            "until": 0.192,
+            "name": "the first point"
+          },
+          {
+            "until": 0.398,
+            "name": "the second point"
+          },
+          {
+            "until": 0.602,
+            "name": "the third point"
+          },
+          {
+            "until": 0.791,
+            "name": "the fourth point"
+          },
+          {
+            "until": 1,
+            "name": "the last point",
+            "short_hint": "The last point stopped short: close the star at the top."
+          }
+        ]
+      },
+      "targets": [
+        "prop.dummy"
+      ],
+      "effect": {
+        "steps": [
+          {
+            "use": "bolt.cast",
+            "from": "tip",
+            "to": "target",
+            "color": "#FF2A2A",
+            "jagged": true
+          },
+          {
+            "use": "prop.reel",
+            "intensity": 1,
+            "delay_ms": 150
+          },
+          {
+            "use": "particles.burst",
+            "preset": "sparks",
+            "at": "target",
+            "count": 40,
+            "color": "#FF4A3A",
+            "delay_ms": 150
+          },
+          {
+            "use": "audio.cue",
+            "cue": "crackle"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "tier": 7
+    },
+    {
+      "id": "avada-kedavra",
+      "incantation": "Avada Kedavra",
+      "known_as": "The Killing Curse",
+      "gesture_text": "A lightning bolt: down and left, right, then down and left.",
+      "description": "A green flash; the dummy drops.",
+      "basis": "app",
+      "heard_as": [
+        "abracadabra",
+        "avada ka davra",
+        "a vada kedavra",
+        "avada cadaver",
+        "avada"
+      ],
+      "gesture": {
+        "path": [[0.9, 0.05], [0.81, 0.1], [0.72, 0.15], [0.62, 0.2], [0.53, 0.25], [0.44, 0.3], [0.35, 0.35], [0.25, 0.39], [0.16, 0.44], [0.24, 0.46], [0.34, 0.48], [0.45, 0.49], [0.55, 0.51], [0.66, 0.52], [0.76, 0.54], [0.84, 0.56], [0.75, 0.61], [0.65, 0.65], [0.56, 0.7], [0.47, 0.75], [0.38, 0.8], [0.28, 0.85], [0.19, 0.9], [0.1, 0.95]],
+        "parts": [
+          {
+            "until": 0.354,
+            "name": "the first stroke"
+          },
+          {
+            "until": 0.646,
+            "name": "the crossing"
+          },
+          {
+            "until": 1,
+            "name": "the last stroke",
+            "short_hint": "The last stroke stopped short: carry it down and to the left."
+          }
+        ]
+      },
+      "targets": [
+        "prop.dummy"
+      ],
+      "effect": {
+        "steps": [
+          {
+            "use": "bolt.cast",
+            "from": "tip",
+            "to": "target",
+            "color": "#3DFF6E",
+            "jagged": true
+          },
+          {
+            "use": "light.flash",
+            "at": "target",
+            "color": "#3DFF6E",
+            "intensity": 0.6,
+            "radius": 0.3,
+            "delay_ms": 160
+          },
+          {
+            "use": "prop.topple",
+            "duration_ms": 6000,
+            "delay_ms": 160
+          },
+          {
+            "use": "audio.cue",
+            "cue": "doom"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "tier": 7
+    }
+  ]
+}

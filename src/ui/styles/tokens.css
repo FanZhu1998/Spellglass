@@ -1,0 +1,139 @@
+/* Design tokens (blueprint Section 10.2). The theme runtime (src/ui/theme.ts) overwrites the theme
+   tokens from the active theme pack, so a theme pack owns the colors a player can restyle (with the
+   accent pairs on Candle and Oxblood). */
+
+:root {
+  --night: #0f1424;
+  --slate: #232a3b;
+  --vellum: #e9dfc7;
+  --ink: #2b2118;
+  --candle: #f2b84b;
+  --oxblood: #7b1e2b;
+  --verdigris: #5fb3a5;
+  --ash: #aba597;
+
+  /* Derived surfaces */
+  --slate-2: color-mix(in srgb, var(--slate) 82%, black);
+  --slate-3: color-mix(in srgb, var(--slate) 60%, var(--night));
+  --night-deep: color-mix(in srgb, var(--night) 70%, black);
+  --vellum-2: color-mix(in srgb, var(--vellum) 88%, var(--ink));
+  --candle-soft: color-mix(in srgb, var(--candle) 22%, transparent);
+  --oxblood-2: color-mix(in srgb, var(--oxblood) 78%, black);
+  --line: color-mix(in srgb, var(--vellum) 16%, transparent);
+  --line-strong: color-mix(in srgb, var(--vellum) 28%, transparent);
+
+  /* ------------------------------------------------------------------ materials of the study
+     The room is a stone study at night: the interface is made of what would be in it (art
+     direction). These are the materials behind the theme tokens; the wax and the candlelight follow
+     the accent pair, the metals and the stone do not. */
+
+  /* Stone wall and its mortar. */
+  --stone: #201f25;
+  --stone-lit: #34333a;
+  --mortar: #0d0c11;
+
+  /* Gold leaf over red bole, worn at the high points. */
+  --gilt-light: #e9cf8a;
+  --gilt: #c9a356;
+  --gilt-dark: #8a6a2c;
+  --gilt-recess: #3e2c12;
+  --bole: #6b2a1e;
+  /* Burnished gold as a surface: lit from the upper left, a dark band where the profile turns. */
+  --gilt-metal: linear-gradient(180deg, #f1dc9f 0%, #d5b265 30%, #a98337 52%, #c9a356 74%, #e3c67f 100%);
+
+  /* Brass, aged: polished where hands touch it, dark and patinated in the field. */
+  --brass-hi: #e6cc8c;
+  --brass: #b08a4a;
+  --brass-dark: #5a4322;
+  --brass-field: #2b2219;
+  --brass-field-2: #1d1711;
+
+  /* The mirror's glass where it reflects nothing: near-neutral silvered black, a little lighter where
+     the room's light falls on it, never navy. It is the stage's own tone (GLASS_BASE in
+     src/modules/effects/stage/core/glass.ts; keep the two alike), so the shell's smaller glasses (the
+     Workshop's drawing pad, the keepsakes' little mirrors, the glass before the stage first draws)
+     match the big one. --glass-rim is the old silver darkening against the frame, --glass-sheen its one
+     static diagonal sheen. */
+  --glass: radial-gradient(120% 90% at 50% 38%, #26252b 0%, #17161c 55%, #0b0a10 100%);
+  --glass-sheen: linear-gradient(118deg, transparent 34%, rgb(236 232 250 / 0.045) 46%, transparent 58%);
+  --glass-rim: inset 0 0 0 1px rgb(0 0 0 / 0.8), inset 0 0 22px 2px rgb(4 3 6 / 0.62);
+
+  /* Oak and the dark leather of the folios; the spellbook's morocco. */
+  --oak: #3a2616;
+  --oak-light: #8a6240;
+  --folio: #1d1714;
+  --folio-2: #2a211b;
+  --leather: #4a1a1d;
+  --leather-dark: #250b0e;
+
+  /* Parchment: Vellum at the centre, browner at the edges, spotted with foxing. */
+  --parchment: var(--vellum);
+  --parchment-edge: #cdb88e;
+  --foxing: #b89a66;
+  /* Rubrics and gilt text on dark grounds. */
+  --rubric: var(--oxblood);
+  --gilt-text: #e2c47e;
+
+  /* Text set on parchment. Each meets 4.5:1 against the parchment's darkest tone under text
+     (--vellum-2 with the fibre texture): ink, then the quieter inks. */
+  --ink-soft: color-mix(in srgb, var(--ink) 84%, var(--vellum));
+  --ink-faint: color-mix(in srgb, var(--ink) 76%, var(--vellum));
+  --ink-green: #22574d;
+  --ink-brown: #6b440c;
+
+  /* Textures, drawn once by the browser into a tile and repeated (no per-frame cost). Grey around
+     the middle, so a blend mode lays them over any material's color. */
+  --tex-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g' x='0' y='0' width='100%25' height='100%25' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' seed='5' stitchTiles='stitch'/%3E%3CfeColorMatrix values='.33 .33 .33 0 0 .33 .33 .33 0 0 .33 .33 .33 0 0 0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g)'/%3E%3C/svg%3E");
+  --tex-fibre: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='f' x='0' y='0' width='100%25' height='100%25' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.011 .42' numOctaves='3' seed='8' stitchTiles='stitch'/%3E%3CfeColorMatrix values='.33 .33 .33 0 0 .33 .33 .33 0 0 .33 .33 .33 0 0 0 0 0 0 1'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='1.7' intercept='-.35'/%3E%3CfeFuncG type='linear' slope='1.7' intercept='-.35'/%3E%3CfeFuncB type='linear' slope='1.7' intercept='-.35'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Cfilter id='g' x='0' y='0' width='100%25' height='100%25' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='2' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='.33 .33 .33 0 0 .33 .33 .33 0 0 .33 .33 .33 0 0 0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='260' height='260' fill='%23808080'/%3E%3Crect width='260' height='260' filter='url(%23f)' opacity='.5'/%3E%3Crect width='260' height='260' filter='url(%23g)' opacity='.45'/%3E%3C/svg%3E");
+  --tex-leather: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='l' x='0' y='0' width='100%25' height='100%25' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='turbulence' baseFrequency='.3' numOctaves='2' seed='3' stitchTiles='stitch'/%3E%3CfeDiffuseLighting surfaceScale='1.3' diffuseConstant='.62' lighting-color='%23fff'%3E%3CfeDistantLight azimuth='225' elevation='58'/%3E%3C/feDiffuseLighting%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='.55' intercept='.23'/%3E%3CfeFuncG type='linear' slope='.55' intercept='.23'/%3E%3CfeFuncB type='linear' slope='.55' intercept='.23'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23l)'/%3E%3C/svg%3E");
+  /* The wall: four courses of irregular blocks with joints that never line up from course to course,
+     a chamfered face to each block, mortar between, and a rough, pitted surface over it all. Alpha
+     only, over --stone. */
+  --tex-stone: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='384'%3E%3Cdefs%3E%3ClinearGradient id='a' x2='1' y2='1'%3E%3Cstop stop-color='%23fff' stop-opacity='.09'/%3E%3Cstop offset='1' stop-color='%23fff' stop-opacity='.015'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x1='.2' x2='.9' y2='1'%3E%3Cstop stop-color='%23fff' stop-opacity='.06'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.07'/%3E%3C/linearGradient%3E%3ClinearGradient id='c' x2='1' y2='.8'%3E%3Cstop stop-color='%23fff' stop-opacity='.035'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.13'/%3E%3C/linearGradient%3E%3ClinearGradient id='d' x1='.1' y1='.1' x2='.8' y2='1'%3E%3Cstop stop-color='%23fff' stop-opacity='.11'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.03'/%3E%3C/linearGradient%3E%3ClinearGradient id='e' x2='.7' y2='1'%3E%3Cstop stop-color='%23fff' stop-opacity='.05'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.1'/%3E%3C/linearGradient%3E%3Cfilter id='w' filterUnits='userSpaceOnUse' x='-24' y='-24' width='688' height='432' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.05' numOctaves='2' seed='4' result='t'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='t' scale='9' xChannelSelector='R' yChannelSelector='G'/%3E%3C/filter%3E%3Cfilter id='r' filterUnits='userSpaceOnUse' x='0' y='0' width='640' height='384' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.035' numOctaves='4' seed='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.7 .9'/%3E%3C/filter%3E%3Cfilter id='l' filterUnits='userSpaceOnUse' x='0' y='0' width='640' height='384' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.02' numOctaves='3' seed='12' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1.8 -1'/%3E%3C/filter%3E%3Cfilter id='p' filterUnits='userSpaceOnUse' x='0' y='0' width='640' height='384' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='2' seed='9' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -4.2 2.2'/%3E%3C/filter%3E%3C/defs%3E%3Crect width='640' height='384' fill='%23000' fill-opacity='.56'/%3E%3Cg filter='url(%23w)' stroke='%23000' stroke-opacity='.4' stroke-width='2'%3E%3Crect x='2' y='2' width='146' height='92' rx='4' fill='url(%23a)'/%3E%3Crect x='152' y='2' width='114' height='92' rx='4' fill='url(%23c)'/%3E%3Crect x='270' y='2' width='168' height='92' rx='4' fill='url(%23b)'/%3E%3Crect x='442' y='2' width='104' height='92' rx='4' fill='url(%23d)'/%3E%3Crect x='550' y='2' width='88' height='92' rx='4' fill='url(%23c)'/%3E%3Crect x='-68' y='98' width='154' height='92' rx='4' fill='url(%23b)'/%3E%3Crect x='572' y='98' width='154' height='92' rx='4' fill='url(%23b)'/%3E%3Crect x='90' y='98' width='154' height='92' rx='4' fill='url(%23d)'/%3E%3Crect x='248' y='98' width='122' height='92' rx='4' fill='url(%23a)'/%3E%3Crect x='374' y='98' width='94' height='92' rx='4' fill='url(%23c)'/%3E%3Crect x='472' y='98' width='96' height='92' rx='4' fill='url(%23e)'/%3E%3Crect x='2' y='194' width='118' height='92' rx='4' fill='url(%23c)'/%3E%3Crect x='124' y='194' width='136' height='92' rx='4' fill='url(%23e)'/%3E%3Crect x='264' y='194' width='94' height='92' rx='4' fill='url(%23d)'/%3E%3Crect x='362' y='194' width='156' height='92' rx='4' fill='url(%23b)'/%3E%3Crect x='522' y='194' width='116' height='92' rx='4' fill='url(%23a)'/%3E%3Crect x='-38' y='290' width='100' height='92' rx='4' fill='url(%23a)'/%3E%3Crect x='602' y='290' width='100' height='92' rx='4' fill='url(%23a)'/%3E%3Crect x='66' y='290' width='146' height='92' rx='4' fill='url(%23b)'/%3E%3Crect x='216' y='290' width='128' height='92' rx='4' fill='url(%23c)'/%3E%3Crect x='348' y='290' width='102' height='92' rx='4' fill='url(%23e)'/%3E%3Crect x='454' y='290' width='144' height='92' rx='4' fill='url(%23d)'/%3E%3C/g%3E%3Crect width='640' height='384' filter='url(%23r)' opacity='.55'/%3E%3Crect width='640' height='384' filter='url(%23l)' opacity='.08'/%3E%3Crect width='640' height='384' filter='url(%23p)' opacity='.6'/%3E%3C/svg%3E");
+
+  /* The ornamental rule between sections: a hairline with a lozenge at its middle, in gilt. */
+  --rule-ornament: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='14' viewBox='0 0 120 14'%3E%3Cg fill='none' stroke='%23c9a356' stroke-linecap='round'%3E%3Cpath d='M2 7h42M76 7h42' stroke-opacity='.55'/%3E%3Cpath d='M44 7c4-4 8-4 10 0-2 4-6 4-10 0zM76 7c-4-4-8-4-10 0 2 4 6 4 10 0z' stroke-opacity='.85'/%3E%3C/g%3E%3Cpath d='M60 1.5 65.5 7 60 12.5 54.5 7z' fill='%23c9a356'/%3E%3Cpath d='M60 4.5 62.5 7 60 9.5 57.5 7z' fill='%233e2c12'/%3E%3C/svg%3E");
+  --rule-ornament-ink: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='14' viewBox='0 0 120 14'%3E%3Cg fill='none' stroke='%232b2118' stroke-linecap='round'%3E%3Cpath d='M2 7h42M76 7h42' stroke-opacity='.35'/%3E%3Cpath d='M44 7c4-4 8-4 10 0-2 4-6 4-10 0zM76 7c-4-4-8-4-10 0 2 4 6 4 10 0z' stroke-opacity='.6'/%3E%3C/g%3E%3Cpath d='M60 1.5 65.5 7 60 12.5 54.5 7z' fill='%237b1e2b'/%3E%3C/svg%3E");
+
+  --font-display: 'IM Fell English', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --font-text: 'Spectral', 'Iowan Old Style', Georgia, serif;
+  /* Small capitals for labels and engraved words; ornate capitals for the wordmark and drop caps. */
+  --font-label: 'IM Fell English SC', var(--font-display);
+  --font-ornate: 'Cinzel Decorative', var(--font-display);
+
+  /* Section 10.2: body text 18 px or larger; secondary labels no smaller than 16 px. */
+  --text-body: 18px;
+  --text-small: 16px;
+  --text-label: 16px;
+  --leading: 1.55;
+
+  --radius: 4px;
+  --radius-small: 3px;
+  --gap: 12px;
+  --gap-large: 20px;
+  --focus: 0 0 0 3px var(--night), 0 0 0 5px var(--candle);
+
+  --shadow-panel: 0 18px 60px rgb(0 0 0 / 0.55), 0 2px 0 rgb(255 255 255 / 0.03) inset;
+  /* Something resting on the wall: a soft shadow to the lower right, away from the candle, cool as
+     the shadows in a room lit only by a candle and the moon. */
+  --shadow-hung: 3px 8px 18px rgb(3 5 14 / 0.55), 1px 2px 4px rgb(3 4 10 / 0.5);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration: 260ms;
+
+  color-scheme: dark;
+}
+
+/* High-contrast trail is a stage setting; the shell offers a high-contrast chrome too. */
+:root[data-contrast='high'] {
+  --ash: #cfc8b6;
+  --line: color-mix(in srgb, var(--vellum) 34%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) {
+    --duration: 0ms;
+  }
+}
+:root[data-motion='reduced'] {
+  --duration: 0ms;
+}

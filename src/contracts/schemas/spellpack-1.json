@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spellpack-1.json",
+  "title": "Spellglass spell pack, format spellpack/1",
+  "description": "A pack of spells: data only, never code (blueprint Section 9.2; TypeScript shape in src/contracts/packs.ts SpellPack). Unknown fields are allowed and kept (Section 9.1 rule 3). Older formats are migrated forward to this one when they load (see spellpack-0.json).",
+  "type": "object",
+  "required": ["schema", "id", "version", "engine", "title", "needs", "spells"],
+  "properties": {
+    "schema": { "type": "string", "const": "spellpack/1" },
+    "id": { "$ref": "common-1.json#/definitions/id" },
+    "version": { "$ref": "common-1.json#/definitions/version" },
+    "engine": {
+      "description": "Engine versions the pack works with, checked against ENGINE_VERSION (src/contracts/v1.ts).",
+      "$ref": "common-1.json#/definitions/range"
+    },
+    "title": { "$ref": "common-1.json#/definitions/shortText" },
+    "description": { "$ref": "common-1.json#/definitions/longText" },
+    "needs": {
+      "description": "Capabilities every spell in the pack needs, such as fx.light@1 and audio@1.",
+      "$ref": "common-1.json#/definitions/capabilities"
+    },
+    "default_enabled": {
+      "description": "The pack is on unless this is false (the restricted section ships off).",
+      "type": "boolean"
+    },
+    "notice": { "type": "string", "maxLength": 400 },
+    "spells": {
+      "type": "array",
+      "maxItems": 200,
+      "items": { "$ref": "#/definitions/spell" }
+    }
+  },
+  "definitions": {
+    "spell": {
+      "type": "object",
+      "required": ["id", "incantation", "gesture", "effect"],
+      "properties": {
+        "id": { "$ref": "common-1.json#/definitions/id" },
+        "incantation": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "known_as": { "type": "string", "maxLength": 80 },
+        "gesture_text": { "type": "string", "maxLength": 200 },
+        "gesture_text_mirrored": { "type": "string", "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 300 },
+        "basis": {
+          "description": "Where the gesture comes from: story, park, list or app (Section 8).",
+          "$ref": "common-1.json#/definitions/token"
+        },
+        "heard_as": {
+          "description": "Mishearings for the fuzzy voice matcher (Section 7.6).",
+          "type": "array",
+          "maxItems": 32,
+          "items": { "type": "string", "minLength": 1, "maxLength": 60 }
+        },
+        "gesture": { "$ref": "common-1.json#/definitions/gesture" },
+        "effect": { "$ref": "common-1.json#/definitions/effect" },
+        "needs": { "$ref": "common-1.json#/definitions/capabilities" },
+        "needs_active": { "$ref": "common-1.json#/definitions/idList" },
+        "ends": { "$ref": "common-1.json#/definitions/spellRefs" },
+        "ended_by": { "$ref": "common-1.json#/definitions/idList" },
+        "targets": { "$ref": "common-1.json#/definitions/targets" },
+        "variants": {
+          "type": "array",
+          "maxItems": 8,
+          "items": { "$ref": "common-1.json#/definitions/variant" }
+        },
+        "cooldown_ms": { "$ref": "common-1.json#/definitions/milliseconds" },
+        "duration_ms": { "$ref": "common-1.json#/definitions/milliseconds" },
+        "tier": { "$ref": "common-1.json#/definitions/tier" }
+      }
+    }
+  }
+}

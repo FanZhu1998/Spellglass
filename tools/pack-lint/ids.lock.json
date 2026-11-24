@@ -1,0 +1,127 @@
+{
+  "note": "Spell and pack ids are permanent (blueprint Section 9.1 rule 1). Pack lint fails when a spell id recorded here disappears or changes its incantation, and when a new id is not recorded yet (\"npm run packs:index\" records new ids; it never changes or removes one). To retire an id for good, set \"retired\": true; it may then never be used again.",
+  "packs": {
+    "candlelit": {
+      "kind": "themepack"
+    },
+    "core-charms": {
+      "kind": "spellpack"
+    },
+    "further-spells": {
+      "kind": "spellpack"
+    },
+    "restricted-section": {
+      "kind": "spellpack"
+    }
+  },
+  "spells": {
+    "accio": {
+      "incantation": "Accio",
+      "pack": "core-charms"
+    },
+    "aguamenti": {
+      "incantation": "Aguamenti",
+      "pack": "core-charms"
+    },
+    "alohomora": {
+      "incantation": "Alohomora",
+      "pack": "core-charms"
+    },
+    "arresto-momentum": {
+      "incantation": "Arresto Momentum",
+      "pack": "further-spells"
+    },
+    "avada-kedavra": {
+      "incantation": "Avada Kedavra",
+      "pack": "restricted-section"
+    },
+    "crucio": {
+      "incantation": "Crucio",
+      "pack": "restricted-section"
+    },
+    "engorgio": {
+      "incantation": "Engorgio",
+      "pack": "further-spells"
+    },
+    "expecto-patronum": {
+      "incantation": "Expecto Patronum",
+      "pack": "core-charms"
+    },
+    "expelliarmus": {
+      "incantation": "Expelliarmus",
+      "pack": "core-charms"
+    },
+    "finite-incantatem": {
+      "incantation": "Finite Incantatem",
+      "pack": "further-spells"
+    },
+    "impedimenta": {
+      "incantation": "Impedimenta",
+      "pack": "further-spells"
+    },
+    "imperio": {
+      "incantation": "Imperio",
+      "pack": "restricted-section"
+    },
+    "incendio": {
+      "incantation": "Incendio",
+      "pack": "core-charms"
+    },
+    "locomotor": {
+      "incantation": "Locomotor",
+      "pack": "further-spells"
+    },
+    "lumos": {
+      "incantation": "Lumos",
+      "pack": "core-charms"
+    },
+    "muffliato": {
+      "incantation": "Muffliato",
+      "pack": "further-spells"
+    },
+    "nox": {
+      "incantation": "Nox",
+      "pack": "core-charms"
+    },
+    "obliviate": {
+      "incantation": "Obliviate",
+      "pack": "further-spells"
+    },
+    "petrificus-totalus": {
+      "incantation": "Petrificus Totalus",
+      "pack": "further-spells"
+    },
+    "protego": {
+      "incantation": "Protego",
+      "pack": "core-charms"
+    },
+    "reducio": {
+      "incantation": "Reducio",
+      "pack": "further-spells"
+    },
+    "reducto": {
+      "incantation": "Reducto",
+      "pack": "further-spells"
+    },
+    "reparo": {
+      "incantation": "Reparo",
+      "pack": "core-charms"
+    },
+    "revelio": {
+      "incantation": "Revelio",
+      "pack": "further-spells"
+    },
+    "riddikulus": {
+      "incantation": "Riddikulus",
+      "pack": "further-spells"
+    },
+    "stupefy": {
+      "incantation": "Stupefy",
+      "pack": "core-charms"
+    },
+    "wingardium-leviosa": {
+      "incantation": "Wingardium Leviosa",
+      "pack": "core-charms"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "packindex-1.json",
+  "title": "Spellglass pack index, format packindex/1",
+  "description": "The list of packs that ship with the app (public/packs/index.json): id, kind, version, path and SHA-256 of each pack file (blueprint Section 9.3, Section 12). Paths are relative to the index file and may not leave its folder. 'npm run packs:index' rewrites the hashes. The loader checks each entry on its own, so one bad entry fails only that pack.",
+  "type": "object",
+  "required": ["schema", "packs"],
+  "properties": {
+    "schema": { "type": "string", "const": "packindex/1" },
+    "packs": {
+      "type": "array",
+      "maxItems": 64,
+      "items": { "$ref": "#/definitions/entry" }
+    }
+  },
+  "definitions": {
+    "entry": {
+      "type": "object",
+      "required": ["id", "kind", "version", "path", "sha256"],
+      "properties": {
+        "id": { "$ref": "common-1.json#/definitions/id" },
+        "kind": { "type": "string", "enum": ["spellpack", "themepack", "gesturepack"] },
+        "version": { "$ref": "common-1.json#/definitions/version" },
+        "path": {
+          "description": "Relative path of the pack file: folder and file names of letters, digits, dots, hyphens and underscores, ending in .json, with no '.' or '..' segments.",
+          "type": "string",
+          "maxLength": 200,
+          "pattern": "^(?!.*(^|/)\\.\\.?(/|$))[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*\\.json$"
+        },
+        "sha256": {
+          "description": "Hex SHA-256 digest of the file's bytes.",
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$"
+        }
+      }
+    }
+  }
+}

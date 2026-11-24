@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- The app's own policy (index.html), so the harness catches anything the hand tracker would trip over.
+         ws: only for the development server's reload socket. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; font-src 'self' data:; connect-src 'self' data: blob: ws:; object-src 'none'; base-uri 'self'"
+    />
+    <title>Hand tracker harness</title>
+    <style>
+      html, body { margin: 0; background: #0f1424; color: #e9dfc7; font-family: Georgia, serif; }
+      main { display: flex; gap: 16px; padding: 16px; align-items: flex-start; }
+      canvas { width: 960px; height: 540px; border-radius: 9px; background: #070a14; }
+      pre { margin: 0; font-size: 12px; line-height: 1.4; max-width: 420px; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <canvas id="view" width="960" height="540"></canvas>
+      <pre id="status">Starting</pre>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

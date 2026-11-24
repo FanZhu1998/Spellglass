@@ -1,0 +1,68 @@
+{
+  "name": "spellglass",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A wand-and-webcam spell-casting app. Unofficial fan project.",
+  "author": {
+    "name": "Fan Zhu"
+  },
+  "type": "module",
+  "main": "desktop/main.mjs",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run gen && vite build",
+    "preview": "vite preview",
+    "gen": "node tools/gen-validators.mjs",
+    "test": "npm run gen && node tools/run-vitest.mjs run",
+    "test:watch": "node tools/run-vitest.mjs",
+    "test:perf": "node tools/run-perf.mjs",
+    "perf:casting": "tsx tools/perf/casting.ts",
+    "test:e2e": "playwright test",
+    "typecheck": "npm run gen && tsc --noEmit -p tsconfig.json && svelte-check --tsconfig ./tsconfig.json --threshold error",
+    "lint:deps": "depcruise src --config .dependency-cruiser.cjs && node tools/check-shell-imports.mjs",
+    "lint:packs": "tsx tools/pack-lint/cli.ts",
+    "packs:index": "tsx tools/pack-lint/cli.ts --write-index",
+    "lab": "tsx tools/gesture-lab/cli.ts",
+    "fixtures:sessions": "tsx tools/gesture-lab/make-sessions.ts",
+    "models": "node tools/fetch-models.mjs",
+    "icons": "node tools/make-icons.mjs",
+    "desktop": "node tools/desktop.mjs run",
+    "desktop:win": "node tools/desktop.mjs win",
+    "desktop:mac": "node tools/desktop.mjs mac",
+    "test:desktop": "npm run build && playwright test -c tests/desktop/playwright.config.ts",
+    "check": "npm run typecheck && npm run lint:deps && npm run lint:packs && npm test"
+  },
+  "dependencies": {
+    "@fontsource/cinzel-decorative": "5.3.0",
+    "@fontsource/im-fell-english": "5.3.0",
+    "@fontsource/im-fell-english-sc": "5.3.0",
+    "@fontsource/spectral": "5.3.0",
+    "@mediapipe/tasks-vision": "1.2.3",
+    "ajv": "8.20.0",
+    "idb": "8.0.4",
+    "uqr": "0.1.3",
+    "workbox-window": "7.4.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "@types/node": "24.19.2",
+    "dependency-cruiser": "18.8.0",
+    "electron": "45.2.3",
+    "electron-builder": "26.18.0",
+    "fake-indexeddb": "6.2.8",
+    "jsdom": "31.0.1",
+    "svelte": "5.59.1",
+    "svelte-check": "4.7.8",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vite": "8.3.8",
+    "vite-plugin-pwa": "2.0.0",
+    "vitest": "5.1.1",
+    "workbox-build": "7.4.1"
+  }
+}

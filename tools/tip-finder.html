@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0F1424" />
+    <meta name="description" content="The Spellglass tracking test: can your camera see the wand tip?" />
+    <!-- The same policy as the app (Section 11.2): connections only to this origin. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; font-src 'self' data:; connect-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'none'"
+    />
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <title>Tip finder · Spellglass</title>
+  </head>
+  <body>
+    <div class="screen-band" id="screen-band" hidden></div>
+    <header class="masthead">
+      <div>
+        <h1>Tip finder</h1>
+        <p class="lede">The tracking test from the Spellglass blueprint (Appendix A): can your camera see the wand tip?</p>
+      </div>
+      <p class="note">
+        The camera image stays on this computer. Values you set here are saved as Spellglass's starting values in this
+        browser, so the app begins where you leave off. A camera profile saved in Wand tuning still wins for that camera.
+      </p>
+    </header>
+
+    <main class="layout">
+      <section class="panel steps" aria-labelledby="steps-title">
+        <h2 id="steps-title">The test, step by step</h2>
+        <p class="hint">One evening. You need the wand, a phone with a flashlight, a room you can dim, and this page.</p>
+        <ol class="checklist" id="checklist">
+          <li data-step="1">
+            <label><input type="checkbox" /> <span class="step-name">Baseline</span></label>
+            <p><strong>Do:</strong> Room lights on. Hold the wand tip 1 m from the camera, pointed at it.</p>
+            <p><strong>Look for:</strong> whether the tip stands out at all. It probably will not.</p>
+          </li>
+          <li data-step="2">
+            <label><input type="checkbox" /> <span class="step-name">Light beside the lens</span></label>
+            <p><strong>Do:</strong> Hold the phone flashlight so it touches the bezel next to the webcam. Dim the room.</p>
+            <p><strong>Look for:</strong> a sharp bright dot at the tip that follows the wand.</p>
+          </li>
+          <li data-step="3">
+            <label><input type="checkbox" /> <span class="step-name">Prove it is the tip reflecting</span></label>
+            <p><strong>Do:</strong> Slide the flashlight 10 cm away from the lens.</p>
+            <p>
+              <strong>Look for:</strong> the dot should fade. If it does, the tip sends light straight back to its source, and
+              tracking with a light beside the lens works.
+            </p>
+          </li>
+          <li data-step="4">
+            <label><input type="checkbox" /> <span class="step-name">Screen as the light</span></label>
+            <p>
+              <strong>Do:</strong> Flashlight off. Turn on the white band below, with the screen at full brightness.
+            </p>
+            <p><strong>Look for:</strong> a fainter dot. If it is usable, no extra light is needed.</p>
+            <label class="inline"><input type="checkbox" id="band-toggle" /> White band at the top of the screen</label>
+          </li>
+          <li data-step="5">
+            <label><input type="checkbox" /> <span class="step-name">Exposure</span></label>
+            <p><strong>Do:</strong> Lower the exposure until the room is nearly black.</p>
+            <p><strong>Look for:</strong> the contrast readout. Aim for the tip to be 3 times brighter than the brightest background, or more.</p>
+          </li>
+          <li data-step="6">
+            <label><input type="checkbox" /> <span class="step-name">Motion</span></label>
+            <p><strong>Do:</strong> Draw circles and flicks at a natural pace.</p>
+            <p><strong>Look for:</strong> the tip found in 9 frames out of 10, and streaks shorter than the dot is wide.</p>
+          </li>
+          <li data-step="7">
+            <label><input type="checkbox" /> <span class="step-name">Distance</span></label>
+            <p><strong>Do:</strong> Repeat steps 5 and 6 at 0.6 m and at 1.5 m.</p>
+            <p><strong>Look for:</strong> the range where they still pass. Record a 10 s session at each distance.</p>
+          </li>
+          <li data-step="8">
+            <label><input type="checkbox" /> <span class="step-name">Infrared leak</span> <span class="optional">optional</span></label>
+            <p><strong>Do:</strong> Point a TV remote at the webcam and press a button.</p>
+            <p>
+              <strong>Look for:</strong> a visible flash. Then the camera passes some infrared, and an infrared LED beside the lens
+              may work without a new camera.
+            </p>
+          </li>
+          <li data-step="9">
+            <label><input type="checkbox" /> <span class="step-name">Camera list</span> <span class="optional">optional</span></label>
+            <p><strong>Do:</strong> Open the camera list on this page.</p>
+            <p><strong>Look for:</strong> a second camera with "IR" in its name. It is marked as infrared.</p>
+          </li>
+          <li data-step="10">
+            <label><input type="checkbox" /> <span class="step-name">Hand tracking</span></label>
+            <p>
+              <strong>Do:</strong> Open
+              <a href="https://developers.google.com/edge/mediapipe/solutions/vision/hand_landmarker/web_js" target="_blank" rel="noopener noreferrer">Google's hand-landmark demo</a>
+              and hold the wand as you would to cast.
+            </p>
+            <p><strong>Look for:</strong> whether the landmarks stay on your hand through a few gestures.</p>
+          </li>
+        </ol>
+
+        <h3>Reading the result</h3>
+        <table class="results">
+          <thead>
+            <tr><th scope="col">If</th><th scope="col">Track with</th><th scope="col">Next</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Steps 2, 5 and 6 pass</td><td>The wand tip, with a clip-on light</td><td>Check whether step 4 removes the need for the light</td></tr>
+            <tr><td>Step 2 shows a dot, but 5 or 6 fail</td><td>Hand or finger, for now</td><td>Try a brighter or coloured light; consider an infrared camera</td></tr>
+            <tr><td>No dot in step 2</td><td>Hand or finger</td><td>The tip probably blocks visible light. An infrared camera is the way to track the real tip</td></tr>
+            <tr><td>Step 8 or 9 positive</td><td>No change</td><td>Try an infrared LED beside the lens, or the infrared camera</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="stage" aria-label="Camera">
+        <div class="frame" id="frame">
+          <video id="preview" muted playsinline></video>
+          <canvas id="overlay" aria-hidden="true"></canvas>
+          <div class="placeholder" id="placeholder">
+            <p>Choose Start camera. Your browser asks for permission first.</p>
+          </div>
+        </div>
+        <div class="threshold">
+          <div class="threshold-head">
+            <h2>What the tracker sees</h2>
+            <p class="key"><span class="swatch candle"></span> bright enough to be the tip <span class="swatch masked"></span> ignored as a lamp or window</p>
+          </div>
+          <canvas id="threshold" width="640" height="360" aria-label="Threshold view: the bright areas the tracker considers"></canvas>
+        </div>
+      </section>
+
+      <section class="panel controls" aria-labelledby="controls-title">
+        <h2 id="controls-title">Camera</h2>
+        <div class="field">
+          <label for="camera-select">Camera</label>
+          <select id="camera-select"><option value="">Default camera</option></select>
+        </div>
+        <div class="buttons">
+          <button type="button" class="primary" id="start">Start camera</button>
+          <button type="button" id="stop" disabled>Stop</button>
+        </div>
+        <p class="status" id="camera-status" role="status">Camera off.</p>
+
+        <h2>Readout</h2>
+        <dl class="readout">
+          <div><dt>Tip brightness</dt><dd id="r-tip">–</dd></div>
+          <div><dt>Brightest background</dt><dd id="r-bg">–</dd></div>
+          <div class="wide"><dt>Contrast</dt><dd><span id="r-contrast" class="big">–</span> <span class="target">aim for 3× or more</span></dd></div>
+          <div class="wide verdict" id="r-verdict" aria-live="polite">Waiting for the tip.</div>
+          <div><dt>Tip found</dt><dd id="r-found">–</dd></div>
+          <div><dt>Blob size</dt><dd id="r-size">–</dd></div>
+          <div><dt>Streak</dt><dd id="r-streak">–</dd></div>
+          <div><dt>Frame rate</dt><dd id="r-fps">–</dd></div>
+          <div><dt>Tracker time</dt><dd id="r-step">–</dd></div>
+          <div><dt>Capture</dt><dd id="r-capture">–</dd></div>
+        </dl>
+
+        <h2>Exposure</h2>
+        <div id="exposure-box">
+          <p class="hint" id="exposure-none">Start the camera to see whether it lets the browser set exposure.</p>
+          <label class="inline"><input type="checkbox" id="exposure-auto" checked disabled /> Automatic exposure</label>
+          <div class="field">
+            <label for="exposure">Exposure time <output id="exposure-value">–</output></label>
+            <input type="range" id="exposure" min="0" max="1000" step="1" disabled />
+          </div>
+        </div>
+
+        <h2>Threshold</h2>
+        <div class="field">
+          <label for="k">k, in mean + k × spread <output id="k-value">4</output></label>
+          <input type="range" id="k" min="1" max="10" step="0.5" />
+        </div>
+        <div class="field">
+          <label for="floor">Brightness floor <output id="floor-value">200</output></label>
+          <input type="range" id="floor" min="0" max="255" step="1" />
+        </div>
+        <div class="field">
+          <label for="channel">Colour of the light</label>
+          <select id="channel">
+            <option value="luma">White (brightness)</option>
+            <option value="r">Red</option>
+            <option value="g">Green</option>
+            <option value="b">Blue</option>
+          </select>
+        </div>
+        <label class="inline"><input type="checkbox" id="mask" /> Ignore lamps and windows that stay put</label>
+        <label class="inline"><input type="checkbox" id="flip" /> Mirror the image (most webcams)</label>
+        <div class="buttons">
+          <button type="button" id="relearn" disabled>Learn the room again</button>
+          <button type="button" id="reset-values">Back to the defaults</button>
+        </div>
+
+        <h2>Record</h2>
+        <div class="field">
+          <label for="title">What you are tracing <span class="optional">optional</span></label>
+          <input type="text" id="title" placeholder="Circles at 1 m" maxlength="80" />
+        </div>
+        <div class="field">
+          <label for="intended">Spell you are casting <span class="optional">optional</span></label>
+          <select id="intended"><option value="">None</option></select>
+        </div>
+        <div class="buttons">
+          <button type="button" class="primary" id="record" disabled>Record 10 s</button>
+        </div>
+        <p class="status" id="record-status" role="status">Records the tip samples as a test fixture file.</p>
+      </section>
+    </main>
+    <footer class="footer">Spellglass is an unofficial fan project, not affiliated with or endorsed by Warner Bros. or Universal.</footer>
+    <script type="module" src="./tip-finder/main.ts"></script>
+  </body>
+</html>

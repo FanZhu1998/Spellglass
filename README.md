@@ -132,7 +132,7 @@ On Windows, run the tests through npm (or `node tools/run-vitest.mjs`): Vitest s
 
 The end-to-end tests run Chrome with `--disable-gpu`. Headless Chrome draws through a software GPU that compiles its shaders the first time the stage uses a canvas effect, which holds input back for several seconds on the first press; the tests check what the app does, not how the GPU draws it.
 
-The desktop tests also start the app with the switches that keep Chromium drawing a covered window (`KEEP_DRAWING` in `tests/desktop/app.ts`), as Playwright does for the browsers it starts. Chromium stops drawing a window that something covers, and the camera's frames stop with it; a window the tests open on a CI Mac may be covered. A player is looking at the window, so this changes nothing for them.
+The desktop tests use `--disable-gpu` on Windows only (`GPU_SWITCHES` in `tests/desktop/app.ts`). On a Mac, Chromium has no software GL to fall back on: with that switch its GPU process gives up at the start, which leaves no WebGL (the hand tracker's MediaPipe needs it, on the CPU too) and the camera at 5 frames a second. So on a Mac they run with the machine's GPU, as players do.
 
 ## How it is built
 

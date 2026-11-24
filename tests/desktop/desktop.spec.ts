@@ -10,8 +10,8 @@ import { expect, test, type ElectronApplication, type Page } from '@playwright/t
 import { writeY4m } from '../../tools/fake-camera/make-y4m';
 import { MOUSE, NO_GPU, casts, draw, seen, waitForCasts } from '../e2e/helpers';
 import {
-  NETWORK_USE, OUTPUT, ROOT, appArgs, closeStarted, closeWindowOf, diagnose, electronEnv, explained, launch, netLogEvents, pageStarted, portableExe,
-  prepare, refused, releaseApp, removeTempDirs, spellglassWindows, start, tempDir, testBuildApp,
+  GPU_SWITCHES, NETWORK_USE, OUTPUT, ROOT, appArgs, closeStarted, closeWindowOf, diagnose, electronEnv, explained, launch, netLogEvents, pageStarted,
+  portableExe, prepare, refused, releaseApp, removeTempDirs, spellglassWindows, start, tempDir, testBuildApp,
 } from './app';
 
 // Each test starts an app of its own, with a user data folder of its own: one that fails does not stop
@@ -293,35 +293,51 @@ test('keeps the page to its own origin: requests, navigation, windows and permis
     }
 
     const fullScreen = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isFullScreen());
-    await explained(launched, async () => {
-      // An element of the page may go full screen (the request needs a click, as in a browser), and
-      // the request settles rather than hanging. (On a Mac each change is an animation of its own,
-      // and one asked for during another waits for it to end.)
-      const html = await app.evaluate(async ({ BrowserWindow }) => {
-        const contents = BrowserWindow.getAllWindows()[0].webContents;
-        const run = (code: string) => contents.executeJavaScript(code, true);
-        const settle = (promise: string) => `Promise.race([${promise}, new Promise((r) => setTimeout(() => r('still waiting'), 10000))])`;
-        const entered = await run(settle(`document.documentElement.requestFullscreen().then(() => 'entered', (e) => 'refused: ' + e.message)`));
-        const element = await run('document.fullscreenElement === document.documentElement');
-        const left = await run(settle(`document.exitFullscreen().then(() => 'left', (e) => 'stuck: ' + e.message)`));
-        return { entered, element, left };
-      });
-      expect(html).toEqual({ entered: 'entered', element: true, left: 'left' });
-      await expect.poll(fullScreen).toBe(false);
-
-      // F11 toggles full screen. (Sent as the system would send it: Playwright's own key presses skip
-      // the main process.)
-      const f11 = () =>
-        app.evaluate(({ BrowserWindow }) => {
-          const contents = BrowserWindow.getAllWindows()[0].webContents;
-          contents.sendInputEvent({ type: 'keyDown', keyCode: 'F11' });
-          contents.sendInputEvent({ type: 'keyUp', keyCode: 'F11' });
-        });
-      await f11();
-      await expect.poll(fullScreen).toBe(true);
-      await f11();
-      await expect.poll(fullScreen).toBe(false);
+    // The window's own account of full screen: the steps below wait on it, and a failure shows it. On
+    // a Mac the window changes in an animation, and says 'enter-full-screen' or 'leave-full-screen'
+    // when it ends; on Windows at once.
+    await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows()[0];
+      const t0 = Date.now();
+      const record: string[] = [];
+      for (const name of ['enter-full-screen', 'leave-full-screen', 'enter-html-full-screen', 'leave-html-full-screen']) {
+        w.on(name as 'enter-full-screen', () => record.push(`${name} ${Date.now() - t0} ms`));
+      }
+      (globalThis as any).__fullScreenRecord = record;
     });
+    const record = () => app.evaluate(() => (globalThis as any).__fullScreenRecord as string[]);
+    const times = async (event: string) => (await record()).filter((r) => r.startsWith(`${event} `)).length;
+    const inPage = (code: string) => app.evaluate(({ BrowserWindow }, c) => BrowserWindow.getAllWindows()[0].webContents.executeJavaScript(c, true), code);
+    const settle = (promise: string) => `Promise.race([${promise}, new Promise((r) => setTimeout(() => r('still waiting'), 10000))])`;
+    await explained(
+      launched,
+      async () => {
+        // An element of the page may go full screen (the request needs a click, as in a browser), and
+        // each request settles rather than hanging. Leaving is asked for once the window is there.
+        expect(await inPage(settle(`document.documentElement.requestFullscreen().then(() => 'entered', (e) => 'refused: ' + e.message)`))).toBe('entered');
+        expect(await inPage('document.fullscreenElement === document.documentElement')).toBe(true);
+        await expect.poll(() => times('enter-full-screen')).toBe(1);
+        expect(await inPage(settle(`document.exitFullscreen().then(() => 'left', (e) => 'stuck: ' + e.message)`))).toBe('left');
+        await expect.poll(() => times('leave-full-screen')).toBe(1);
+        expect(await fullScreen()).toBe(false);
+
+        // F11 toggles full screen. (Sent as the system would send it: Playwright's own key presses skip
+        // the main process.)
+        const f11 = () =>
+          app.evaluate(({ BrowserWindow }) => {
+            const contents = BrowserWindow.getAllWindows()[0].webContents;
+            contents.sendInputEvent({ type: 'keyDown', keyCode: 'F11' });
+            contents.sendInputEvent({ type: 'keyUp', keyCode: 'F11' });
+          });
+        await f11();
+        await expect.poll(() => times('enter-full-screen')).toBe(2);
+        expect(await fullScreen()).toBe(true);
+        await f11();
+        await expect.poll(() => times('leave-full-screen')).toBe(2);
+        expect(await fullScreen()).toBe(false);
+      },
+      async () => `full screen: ${(await record()).join(', ') || 'nothing from the window'}`,
+    );
   } finally {
     await closeApp(app);
   }
@@ -550,7 +566,7 @@ test('the release build ignores the debugging switches, and uses no network from
   const netLog = join(dir, 'net-log.json');
   // As a double-click starts it, plus the switches that would open it to other programs: Node's
   // inspector (the fuse makes Electron ignore it) and Chromium's remote debugging (main.mjs drops it).
-  const app = start(executable!, [`--spellglass-user-data=${userData}`, ...NO_GPU, '--inspect=0', '--remote-debugging-port=0', `--log-net-log=${netLog}`]);
+  const app = start(executable!, [`--spellglass-user-data=${userData}`, ...GPU_SWITCHES, '--inspect=0', '--remote-debugging-port=0', `--log-net-log=${netLog}`]);
   try {
     await expect.poll(() => pageStarted(userData), { timeout: 60_000 }).toBe(true);
     await new Promise((r) => setTimeout(r, 3000));
@@ -651,34 +667,41 @@ test('the portable .exe: a second double-click hands over, and copies left behin
   }
 });
 
-// A report for CI, not a check: how this system shows a window the tests start, as players get it
-// (Chromium slows a covered window down) and as the other tests run it (KEEP_DRAWING in app.ts), with
-// the camera's frames counted. It explains what fails on one system only; it fails only if the app
-// does not start.
-test('a report on how this system shows the window (CI only)', async () => {
+// A report for CI, not a check: the camera's frames and what Chromium says of the GPU, with the GPU
+// switches the tests use here (GPU_SWITCHES in app.ts) and with the other choice, so what fails on one
+// system only can be told apart from the switches. It fails only if the app does not start.
+test('a report on the GPU and the camera on this system (CI only)', async () => {
   test.skip(!process.env.CI, 'A report for CI runs.');
   test.setTimeout(120_000);
   const parts: string[] = [];
-  for (const throttled of [true, false]) {
-    const launched = await launch({ userData: tempDir('spellglass-desktop-report-'), fakeCamera: true, throttled });
+  for (const gpuSwitches of [GPU_SWITCHES, GPU_SWITCHES.length ? [] : NO_GPU]) {
+    const launched = await launch({ userData: tempDir('spellglass-desktop-report-'), fakeCamera: true, gpuSwitches });
     try {
       await prepare(launched.page, { 'app.onboarded': true, 'capture.consent': true, 'tracker.active': 'tracker.bright-tip' });
+      // 'camera.frame' events in each of the first 10 seconds after the camera is on. (With the GPU
+      // on, the first frame callbacks may come seconds after the camera starts.)
       const frames = await launched.page.evaluate(async () => {
         const { kernel } = (window as any).__spellglass;
         const on = () => ((window as any).__seen as { type: string; p: any }[]).some((e) => e.type === 'camera.status' && e.p.state === 'on');
         const t0 = performance.now();
-        while (!on() && performance.now() - t0 < 20_000) await new Promise((r) => setTimeout(r, 200));
-        let n = 0;
-        const off = kernel.subscribe('camera.frame', () => n++);
-        await new Promise((r) => setTimeout(r, 2000));
+        while (!on() && performance.now() - t0 < 20_000) await new Promise((r) => setTimeout(r, 50));
+        const onAt = performance.now();
+        const perSecond: number[] = new Array(10).fill(0);
+        const off = kernel.subscribe('camera.frame', () => {
+          const s = Math.floor((performance.now() - onAt) / 1000);
+          if (s < perSecond.length) perSecond[s]++;
+        });
+        await new Promise((r) => setTimeout(r, 10_000));
         if (typeof off === 'function') off();
-        return n;
+        const webgl2 = typeof OffscreenCanvas === 'function' && !!new OffscreenCanvas(1, 1).getContext('webgl2');
+        return `camera frames in each second: ${perSecond.join(' ')}; WebGL2 ${webgl2 ? 'yes' : 'no'}`;
       });
-      parts.push(`${throttled ? 'As players get it' : 'As the tests run it'}: ${frames} camera frames in 2 s.\n${await diagnose(launched)}`);
+      const account = (await diagnose(launched)).split('\n').filter((l) => /^(page|camera|trackers|gpu):/.test(l));
+      parts.push([`With ${gpuSwitches.join(' ') || 'no GPU switch'}${gpuSwitches === GPU_SWITCHES ? ' (as the tests run)' : ''}: ${frames}`, ...account].join('\n'));
     } finally {
       await closeApp(launched.app);
     }
   }
   const text = parts.join('\n\n');
-  console.log(`\n::notice title=How ${process.platform} shows the window::${text.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')}`);
+  console.log(`\n::notice title=GPU and camera on ${process.platform}::${text.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')}`);
 });

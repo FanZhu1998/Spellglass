@@ -62,12 +62,14 @@ export function closeWindowOf(pid: number): void {
 }
 
 /**
- * Chromium stops drawing a window that something covers: no animation frames, no video frame callbacks
- * (which bring the camera's frames), and timers slowed to once a second. A test machine's window may
- * well be covered (a Mac on CI is), so the tests switch that off, as Playwright does for the browsers
- * it starts. A player looks at the window, and gets Chromium's own behaviour.
+ * The GPU switches the app is started with. On Windows, --disable-gpu, as the browser tests have it
+ * (tests/e2e/helpers.ts): Chromium draws in software, and WebGL still works. A Mac has no software GL
+ * for Chromium: with --disable-gpu its GPU process gives up at the start ("Initialization of all EGL
+ * display types failed"), which leaves no WebGL (MediaPipe needs it, on its CPU delegate too) and the
+ * camera at 5 frames a second instead of 20 (Chromium hands its frames over in GPU memory there). So on
+ * a Mac the tests use the GPU the machine has, as players do.
  */
-export const KEEP_DRAWING = ['--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'];
+export const GPU_SWITCHES = process.platform === 'darwin' ? [] : NO_GPU;
 
 /** Electron must not inherit ELECTRON_RUN_AS_NODE (some editors set it): it would start as plain Node. */
 export function electronEnv(): Record<string, string> {
@@ -85,16 +87,14 @@ export interface LaunchOptions {
   fakeCamera?: string | true;
   /** More switches, for Chromium (a net log, fake devices without the fake prompt). */
   extraArgs?: string[];
-  /** Leave out KEEP_DRAWING: Chromium slows a covered window down, as it does for players. */
-  throttled?: boolean;
+  /** The GPU switches instead of GPU_SWITCHES (the CI report compares them). */
+  gpuSwitches?: string[];
 }
 
 /** The arguments the app is started with (also for a second instance started by hand). */
 export function appArgs(opts: LaunchOptions): string[] {
   const camera = opts.fakeCamera === true ? ['--spellglass-fake-camera'] : opts.fakeCamera ? [`--spellglass-fake-camera=${opts.fakeCamera}`] : [];
-  return [
-    ...(opts.executablePath ? [] : [ROOT]), `--spellglass-user-data=${opts.userData}`, ...NO_GPU, ...(opts.throttled ? [] : KEEP_DRAWING), ...camera, ...(opts.extraArgs ?? []),
-  ];
+  return [...(opts.executablePath ? [] : [ROOT]), `--spellglass-user-data=${opts.userData}`, ...(opts.gpuSwitches ?? GPU_SWITCHES), ...camera, ...(opts.extraArgs ?? [])];
 }
 
 /** An app the tests drive, with the last lines it and its page wrote (for diagnose()). */
@@ -121,14 +121,20 @@ export async function launch(opts: LaunchOptions): Promise<Launched> {
   return { app, page, output: () => [...lines] };
 }
 
+/** A Chromium log line without its process, time and folders ("ERROR gl_display.cc:648 ..."), so repeats count as one. */
+function plainLine(line: string): string {
+  return line.replace(/\[\d+:\d+\/[\d.]+:(\w+):(?:[^\]/]*\/)*([^\]/]+)\]\s*/, '$1 $2 ');
+}
+
 /**
- * What the app was doing, for a test that failed: whether the page is shown and drawing, what the
- * camera and the trackers said (from the events prepare() records), the modules' states, the main
- * window, and the last lines of output. Never throws.
+ * What the app was doing, for a test that failed, in a few lines (CI shows the first 4 KB of a
+ * failure): whether the page is shown and drawing, what the camera and the trackers said (from the
+ * events prepare() records), the modules, the window, what Chromium says of the GPU, and the distinct
+ * lines of output, each with how often it came. Never throws.
  */
 export async function diagnose(launched: Launched): Promise<string> {
   const { app, page } = launched;
-  const pageState = await page
+  const pageLines = await page
     .evaluate(async () => {
       // Animation frames in one second (none when Chromium stopped drawing the page).
       const frames = await new Promise<number>((resolve) => {
@@ -145,40 +151,48 @@ export async function diagnose(launched: Launched): Promise<string> {
       const seen = ((window as any).__seen ?? []) as { type: string; p: any }[];
       const counts: Record<string, number> = {};
       for (const e of seen) counts[e.type] = (counts[e.type] ?? 0) + 1;
-      // Each change of state once, in order.
+      // Each change of state once, in order, the last few.
       const changes = (type: string, say: (p: any) => string) =>
-        seen.filter((e) => e.type === type).map((e) => say(e.p)).filter((s, i, all) => s !== all[i - 1]);
+        seen.filter((e) => e.type === type).map((e) => say(e.p)).filter((s, i, all) => s !== all[i - 1]).slice(-8).join(' > ') || 'none';
       const { kernel } = (window as any).__spellglass ?? {};
-      return {
-        visibility: document.visibilityState,
-        focused: document.hasFocus(),
-        framesInASecond: frames,
-        events: counts,
-        camera: changes('camera.status', (p) => [p.state, p.width && `${p.width}x${p.height}`, p.fps && `${p.fps} fps`, p.message].filter(Boolean).join(' ')),
-        trackers: changes('tracker.status', (p) => [p.tracker, p.state, p.message].filter(Boolean).join(' ')),
-        recognitions: seen.filter((e) => e.type === 'recognition.result').slice(-3).map((e) => JSON.stringify(e.p).slice(0, 300)),
-        modules: kernel?.modules?.().map((m: any) => `${m.manifest.id} ${m.state}`),
-      };
+      return [
+        `page: ${document.visibilityState}, ${document.hasFocus() ? 'focused' : 'not focused'}, ${frames} frames/s; events: ${Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(', ') || 'none'}`,
+        `camera: ${changes('camera.status', (p) => [p.state, p.width && `${p.width}x${p.height}`, p.fps && `${p.fps} fps`, p.message].filter(Boolean).join(' '))}`,
+        `trackers: ${changes('tracker.status', (p) => [p.tracker, p.state, p.message && `(${p.message})`].filter(Boolean).join(' '))}`,
+        `modules: ${kernel?.modules?.().map((m: any) => `${m.manifest.id} ${m.state}`).join(', ')}`,
+      ];
     })
-    .catch((err: unknown) => ({ unreadable: String(err) }));
-  const win = await app
-    .evaluate(({ BrowserWindow, screen }) => {
+    .catch((err: unknown) => [`page: unreadable (${String(err).slice(0, 200)})`]);
+  const mainLines = await app
+    .evaluate(({ app: a, BrowserWindow, screen }) => {
+      const gpu = Object.entries(a.getGPUFeatureStatus() as unknown as Record<string, string>).filter(([, v]) => !v.startsWith('enabled'));
       const w = BrowserWindow.getAllWindows().find((x) => x.webContents.getURL() === 'app://spellglass/');
-      if (!w) return 'no main window';
-      const display = screen.getDisplayMatching(w.getBounds());
-      return { visible: w.isVisible(), focused: w.isFocused(), minimized: w.isMinimized(), fullScreen: w.isFullScreen(), bounds: w.getBounds(), workArea: display.workArea };
+      const lines = [`gpu: ${gpu.map(([k, v]) => `${k} ${v}`).join(', ') || 'all enabled'}`];
+      if (!w) return [...lines, 'window: none'];
+      const b = w.getBounds();
+      const area = screen.getDisplayMatching(b).workArea;
+      const flags = [w.isVisible() ? 'visible' : 'hidden', w.isFocused() ? 'focused' : 'not focused', w.isMinimized() && 'minimized', w.isFullScreen() && 'full screen'];
+      return [...lines, `window: ${flags.filter(Boolean).join(', ')}, ${b.width}x${b.height} at ${b.x},${b.y}; work area ${area.width}x${area.height}`];
     })
-    .catch((err: unknown) => String(err));
-  return JSON.stringify({ page: pageState, window: win, output: launched.output().slice(-40) }, null, 1);
+    .catch((err: unknown) => [`main: unreadable (${String(err).slice(0, 200)})`]);
+  const counted = new Map<string, number>();
+  for (const line of launched.output()) {
+    const plain = plainLine(line).slice(0, 140);
+    counted.set(plain, (counted.get(plain) ?? 0) + 1);
+  }
+  const distinct = [...counted].map(([line, n]) => (n > 1 ? `${line} (x${n})` : line));
+  const output = distinct.length > 14 ? [...distinct.slice(0, 5), `... ${distinct.length - 14} more ...`, ...distinct.slice(-9)] : distinct;
+  return [...pageLines, ...mainLines, 'output:', ...output.map((l) => `  ${l}`)].join('\n');
 }
 
-/** Run `step`; should it fail, its error carries diagnose()'s account of the app. */
-export async function explained<T>(launched: Launched, step: () => Promise<T>): Promise<T> {
+/** Run `step`; should it fail, its error carries diagnose()'s account of the app, and `more` (a test's own record). */
+export async function explained<T>(launched: Launched, step: () => Promise<T>, more?: () => Promise<string>): Promise<T> {
   try {
     return await step();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    throw new Error(`${message}\n\nWhat the app was doing:\n${await diagnose(launched)}`, { cause: err });
+    const own = more ? await more().catch((e: unknown) => `unreadable: ${String(e)}`) : '';
+    throw new Error(`${message}\n\nWhat the app was doing:\n${own ? `${own}\n` : ''}${await diagnose(launched)}`, { cause: err });
   }
 }
 

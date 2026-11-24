@@ -8,9 +8,9 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test';
 import { writeY4m } from '../../tools/fake-camera/make-y4m';
-import { MOUSE, NO_GPU, casts, draw, seen, waitForCasts } from '../e2e/helpers';
+import { MOUSE, casts, draw, seen, waitForCasts } from '../e2e/helpers';
 import {
-  GPU_SWITCHES, NETWORK_USE, OUTPUT, ROOT, appArgs, closeStarted, closeWindowOf, diagnose, electronEnv, explained, launch, netLogEvents, pageStarted,
+  GPU_SWITCHES, NETWORK_USE, OUTPUT, ROOT, appArgs, closeStarted, closeWindowOf, electronEnv, explained, launch, netLogEvents, pageStarted,
   portableExe, prepare, refused, releaseApp, removeTempDirs, spellglassWindows, start, tempDir, testBuildApp,
 } from './app';
 
@@ -667,41 +667,3 @@ test('the portable .exe: a second double-click hands over, and copies left behin
   }
 });
 
-// A report for CI, not a check: the camera's frames and what Chromium says of the GPU, with the GPU
-// switches the tests use here (GPU_SWITCHES in app.ts) and with the other choice, so what fails on one
-// system only can be told apart from the switches. It fails only if the app does not start.
-test('a report on the GPU and the camera on this system (CI only)', async () => {
-  test.skip(!process.env.CI, 'A report for CI runs.');
-  test.setTimeout(120_000);
-  const parts: string[] = [];
-  for (const gpuSwitches of [GPU_SWITCHES, GPU_SWITCHES.length ? [] : NO_GPU]) {
-    const launched = await launch({ userData: tempDir('spellglass-desktop-report-'), fakeCamera: true, gpuSwitches });
-    try {
-      await prepare(launched.page, { 'app.onboarded': true, 'capture.consent': true, 'tracker.active': 'tracker.bright-tip' });
-      // 'camera.frame' events in each of the first 10 seconds after the camera is on. (With the GPU
-      // on, the first frame callbacks may come seconds after the camera starts.)
-      const frames = await launched.page.evaluate(async () => {
-        const { kernel } = (window as any).__spellglass;
-        const on = () => ((window as any).__seen as { type: string; p: any }[]).some((e) => e.type === 'camera.status' && e.p.state === 'on');
-        const t0 = performance.now();
-        while (!on() && performance.now() - t0 < 20_000) await new Promise((r) => setTimeout(r, 50));
-        const onAt = performance.now();
-        const perSecond: number[] = new Array(10).fill(0);
-        const off = kernel.subscribe('camera.frame', () => {
-          const s = Math.floor((performance.now() - onAt) / 1000);
-          if (s < perSecond.length) perSecond[s]++;
-        });
-        await new Promise((r) => setTimeout(r, 10_000));
-        if (typeof off === 'function') off();
-        const webgl2 = typeof OffscreenCanvas === 'function' && !!new OffscreenCanvas(1, 1).getContext('webgl2');
-        return `camera frames in each second: ${perSecond.join(' ')}; WebGL2 ${webgl2 ? 'yes' : 'no'}`;
-      });
-      const account = (await diagnose(launched)).split('\n').filter((l) => /^(page|camera|trackers|gpu):/.test(l));
-      parts.push([`With ${gpuSwitches.join(' ') || 'no GPU switch'}${gpuSwitches === GPU_SWITCHES ? ' (as the tests run)' : ''}: ${frames}`, ...account].join('\n'));
-    } finally {
-      await closeApp(launched.app);
-    }
-  }
-  const text = parts.join('\n\n');
-  console.log(`\n::notice title=GPU and camera on ${process.platform}::${text.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')}`);
-});

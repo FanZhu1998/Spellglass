@@ -33,6 +33,7 @@ import { InkLayer, type InkStroke, type InkStyle } from './ink';
 import { LightLayer } from './light';
 import { cleanText, scaleParticleCount, wrapText } from './limits';
 import { guidePath, pointAlong, settleTarget, toCurrentAspect } from './morph';
+import { drawThisFrame } from './pacing';
 import { ParticleSystem } from './particles';
 import { PracticeGuide } from './practice';
 import { createRandom, pick, type Random } from './random';
@@ -50,6 +51,9 @@ import { pixelRatioFor, View, type StageQuality } from './view';
 const log = logger('stage');
 
 export const STAGE_ID = 'effect.stage';
+/** An effect is drawn every frame for this long after it starts, also one that then holds still (a
+ *  held light's bloom, a prop's lift): pacing.ts. */
+export const EFFECT_ONSET_MS = 1500;
 const DEFAULT_CANDLE = '#F2B84B';
 const DEFAULT_VELLUM = '#E9DFC7';
 
@@ -167,6 +171,9 @@ export class StageCore implements StageWorld {
   private backup: ReturnType<typeof setInterval> | null = null;
   private lastFrame = 0;
   private lastTickAt = -Infinity;
+  /** When the canvases were last drawn, and whether a tip has come since (pacing.ts). */
+  private lastDrawAt = -Infinity;
+  private tipSinceDraw = false;
   private observer: ResizeObserver | null = null;
   private sleepers = new Set<() => void>();
   private errors = new Set<string>();
@@ -443,6 +450,8 @@ export class StageCore implements StageWorld {
 
   private onTip(s: TipSample): void {
     const now = this.now();
+    // The next animation frame draws, so the trail shows this sample as early as it can (pacing.ts).
+    this.tipSinceDraw = true;
     const src = typeof s.src === 'string' ? s.src : null;
     if (src !== this.tipSrc) {
       this.tipSrc = src;
@@ -829,12 +838,35 @@ export class StageCore implements StageWorld {
   private readonly onFrame = () => {
     this.raf = 0;
     if (!this.running) return;
-    this.tick(this.now(), true);
+    this.tick(this.now(), 'paced');
     this.ensureLoop();
   };
 
-  /** One step of the stage: run due steps, advance every picture, then draw. Public for tests. */
-  tick(now: number, draw = !!this.dom): void {
+  /** Something on the glass must look smooth, so every animation frame draws (pacing.ts): a spell's
+   *  effect starting or running, particles, bolts, shields, creatures, a reveal, a shake, text, light
+   *  or ink changing, a prop changing, the practice guide, a replay, a steered prop, a clip. Public for
+   *  tests. */
+  animating(now: number): boolean {
+    if (this.replaySession || this.steeringCastId || this.clips.active || this.guide.path) return true;
+    if (this.particles.count > 0 || this.bolts.length || this.shields.length || this.creatures.length) return true;
+    if (this.shake.active(now) || this.reveal.reveals.length || this.text.incantation || this.text.extras.length) return true;
+    if (this.light.animating(now) || this.ink.animating(now)) return true;
+    for (const a of this.directorInstance.ongoing()) {
+      if (!a.ended && (!a.ongoing.held || now - a.startedAt < EFFECT_ONSET_MS)) return true;
+    }
+    // A prop without settled() is always settled (types.ts PropView).
+    for (const p of this.shelf.props) if (p.settled && !p.settled()) return true;
+    return false;
+  }
+
+  /** Whether an animation frame at `now` draws (pacing.ts). Public for tests. */
+  drawDue(now: number): boolean {
+    return drawThisFrame({ busy: this.animating(now), newTip: this.tipSinceDraw, sinceDraw: now - this.lastDrawAt });
+  }
+
+  /** One step of the stage: run due steps, advance every picture, then draw: always (true), never
+   *  (false), or as pacing.ts decides ('paced', the animation frames). Public for tests. */
+  tick(now: number, draw: boolean | 'paced' = !!this.dom): void {
     try {
       const rawDt = Math.min(100, Math.max(0, now - this.lastFrame));
       this.lastFrame = now;
@@ -880,7 +912,10 @@ export class StageCore implements StageWorld {
       // growth follows the offset, so it eases away as the shake decays (no zoom jump at the end).
       const reach = Math.max(Math.abs(shake.dx), Math.abs(shake.dy));
       this.dom?.setShake(shake.dx, shake.dy, reach > 0 ? 1 + (2 * reach) / Math.max(1, Math.min(this.view.width, this.view.height)) : 1);
-      if (draw && this.dom) {
+      // Decided after the step, so an effect that starts in this frame is drawn in it.
+      if ((draw === 'paced' ? this.drawDue(now) : draw) && this.dom) {
+        this.lastDrawAt = now;
+        this.tipSinceDraw = false;
         const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
         this.draw(this.dom, now);
         if (this.clips.active) this.clips.composite(this.dom, this.view, this.videoShown(), this.flipX, this.cam.filter, shake);

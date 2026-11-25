@@ -360,6 +360,63 @@ describe('steering', () => {
   });
 });
 
+describe('pacing: what keeps every frame drawn (pacing.ts)', () => {
+  /** Advance until the stage is quiet, up to `limit` ms; returns how long that took (Infinity: never). */
+  const untilQuiet = (r: Rig, limit: number): number => {
+    const start = r.now();
+    while (r.core.animating(r.now())) {
+      if (r.now() - start >= limit) return Infinity;
+      r.advance(16);
+    }
+    return r.now() - start;
+  };
+
+  it('is quiet with nothing on the glass, and while a tip is traced', async () => {
+    const r = await rig();
+    expect(r.core.animating(r.now())).toBe(false);
+    r.kernel.emit('tip.filtered', { t: r.now(), x: 0.4, y: 0.5, conf: 1, src: 'tracker.bright-tip' }, 'stroke');
+    r.advance(16);
+    expect(r.core.animating(r.now())).toBe(false);
+  });
+
+  it('keeps every frame while a cast plays, then lets a held light rest while it stays lit', async () => {
+    const r = await rig();
+    r.cast('lumos');
+    r.advance(16);
+    // The orb blooms, the room dims, the incantation is written: all of it must look smooth.
+    expect(r.core.animating(r.now())).toBe(true);
+    r.advance(1000);
+    expect(r.core.animating(r.now())).toBe(true);
+    const quietAfter = untilQuiet(r, 15_000);
+    expect(quietAfter).toBeLessThan(15_000);
+    // Quiet with Lumos still lit: its flicker and the dimmed room are drawn on demand.
+    expect(r.core.light.orbs.some((o) => o.state === 'lit')).toBe(true);
+    expect(r.core.light.dim).toBeGreaterThan(0);
+    // Nox puts it out: going out is a change again.
+    r.cast('nox');
+    r.advance(16);
+    expect(r.core.animating(r.now())).toBe(true);
+    expect(untilQuiet(r, 15_000)).toBeLessThan(15_000);
+    expect(r.core.light.orbs).toHaveLength(0);
+  });
+
+  it('keeps every frame while particles fly and a prop is steered', async () => {
+    const r = await rig();
+    r.cast('aguamenti', { targetId: 'candle' });
+    r.advance(400);
+    expect(r.core.particles.count).toBeGreaterThan(0);
+    expect(r.core.animating(r.now())).toBe(true);
+    r.advance(800);
+    // The fake candle finishes its douse when told to (a real prop ends its own action).
+    for (const a of r.props.candle.applied) a.action.done();
+    expect(untilQuiet(r, 15_000)).toBeLessThan(15_000);
+    r.cast('leviosa', { targetId: 'feather' });
+    r.advance(2000);
+    // Past the effect's onset, the steered feather still keeps every frame.
+    expect(r.core.animating(r.now())).toBe(true);
+  });
+});
+
 describe('the tip on the glass', () => {
   const status = (tracker: string, segmentation?: unknown) =>
     ({ tracker, state: 'tracking', lock: 1, fps: 30, aspect: 16 / 9, pen: false, ...(segmentation ? { segmentation } : {}) }) as TrackerStatus;

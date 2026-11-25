@@ -269,6 +269,19 @@ export class LightLayer {
     return t;
   }
 
+  /** The light is changing: an orb blooming, growing or going out, a flash or soft glow, the room
+   *  dimming or coming back. The stage then draws every frame (pacing.ts). A lit orb's flicker, and a
+   *  held orb following the wand, are not changes here: the stage draws those on demand. */
+  animating(now: number): boolean {
+    if (this.flashes.length) return true;
+    if (this.dim !== this.dimTarget()) return true;
+    for (const o of this.orbs) {
+      if (o.state !== 'lit' || o.level !== o.target) return true;
+      if (o.quick && now - o.born < ORB_GROW_MS) return true;
+    }
+    return false;
+  }
+
   update(now: number, rawDt: number, followDt: number): void {
     for (const d of this.dims) if (d.active && d.until !== null && now >= d.until) this.endDim(d);
     // The lists are rebuilt only when something has gone, so an ordinary frame allocates nothing.

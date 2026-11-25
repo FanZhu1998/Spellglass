@@ -187,6 +187,8 @@ export const HALO_PASSES: readonly [width: number, alpha: number][] = [
 export const HALO_PASSES_LOW: readonly [width: number, alpha: number][] = [[5.5, 0.06], [3.4, 0.1], [2.1, 0.16]];
 /** An undecided stroke whose wait ('spell.pending') overruns its deadline by this much fades anyway. */
 const PENDING_GRACE_MS = 2500;
+/** A stroke that has settled into its spell's shape pulses this long (drawLight). */
+const SETTLED_PULSE_MS = 480;
 /** Dulled ink: a dark pigment on the shade layer (it shows on a bright room) under a tarnished
  *  sheen on the light layer (it shows on a dark one). */
 const DULL = 'rgba(52, 42, 33, 0.86)';
@@ -377,6 +379,19 @@ export class InkLayer {
     this.strokes = [];
   }
 
+  /** Ink is moving of itself: a stroke settling into its spell's shape or pulsing as it settles,
+   *  dripping after a fizzle, or carrying the listening glint ('spell.pending'). The stage then draws
+   *  every frame (pacing.ts). Ink being traced moves with the tip, and drying or fading ink changes
+   *  slowly: the stage draws those on demand. */
+  animating(now: number): boolean {
+    for (const s of this.strokes) {
+      if (s.dead) continue;
+      if (s.pending || s.state === 'settling' || s.state === 'dripping') return true;
+      if (s.state === 'settled' && now - s.since < SETTLED_PULSE_MS) return true;
+    }
+    return false;
+  }
+
   update(now: number): void {
     for (const s of this.strokes) {
       if (s.dead) continue;
@@ -541,7 +556,7 @@ export class InkLayer {
     if (!hc) {
       const settledGlow = s.state === 'settling' || s.state === 'settled';
       // As it settles the line brightens, then the glow eases back.
-      const pulse = s.state === 'settled' && !s.still ? 1 + 0.5 * Math.max(0, 1 - (now - s.since) / 480) : 1;
+      const pulse = s.state === 'settled' && !s.still ? 1 + 0.5 * Math.max(0, 1 - (now - s.since) / SETTLED_PULSE_MS) : 1;
       ctx.globalCompositeOperation = 'lighter';
       ctx.strokeStyle = HALO;
       for (const [k, a] of style.quality === 'low' ? HALO_PASSES_LOW : HALO_PASSES) {

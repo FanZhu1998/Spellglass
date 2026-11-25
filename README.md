@@ -18,7 +18,7 @@ The desktop app is Spellglass in one file: no browser, no internet connection, n
 
 **The camera.** The first time you choose a camera route on a Mac, macOS asks whether Spellglass may use the camera: choose Allow (if you chose not to, turn Spellglass on in System Settings › Privacy & Security › Camera). Windows does not ask, but desktop apps must be allowed the camera in Settings › Privacy & security › Camera. Casting with your hand? See [Playing with your hand](#playing-with-your-hand) for the camera features to turn off.
 
-- **F11** turns full screen on and off (on a Mac: Control-Command-F, or the green button).
+- **F11** turns full screen on and off (on a Mac: Control-Command-F, or the green button). With integrated graphics on a 4K screen, full screen can be more than the GPU draws in time: measured on one such machine, about 36 frames a second and the trail 84 ms behind the camera, against 60 and 31 ms in the default window. If casting feels sluggish there, play in a window.
 - Progress, drawings, keepsakes and settings stay on the computer (`%APPDATA%\Spellglass` on Windows, `~/Library/Application Support/Spellglass` on a Mac) and survive closing the app and new versions of it. They are separate from Spellglass in a browser: to move them, use Workshop › Your data › Export my data, and import the file on the other side.
 - Cards, clips and exported data go to your Downloads folder.
 - Opening Spellglass while it is open brings its window forward.
@@ -184,7 +184,7 @@ Developer pages that are not part of the build: the stage harness (`src/modules/
 
 ## What has not been tried yet
 
-Everything above is covered by about 1,500 automated tests, and the camera pipeline has cast spells end to end in Chrome from a fake-camera clip of a bright dot. The time budgets of Section 13 hold in `npm run test:perf`; in headless Chrome on the development machine, without a real GPU, casting now and then runs one 50 to 130 ms task around the first casts of a session, so measure on the reference laptop before a release (`npm run preview`, then `npm run perf:casting`). Not yet tried with real hardware:
+Everything above is covered by about 1,600 automated tests, and the camera pipeline has cast spells end to end in Chrome from a fake-camera clip of a bright dot. The time budgets of Section 13 hold in `npm run test:perf`; in headless Chrome on the development machine, without a real GPU, casting now and then runs one 50 to 130 ms task around the first casts of a session, so measure on the reference laptop before a release (`npm run preview`, then `npm run perf:casting`). Not yet tried with real hardware:
 
 - a real wand and webcam (Appendix A is the first step);
 - camera exposure control (Chrome's fake camera offers none);

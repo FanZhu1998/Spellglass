@@ -59,6 +59,38 @@ export const INK = {
   maxPoints: 900,
 } as const;
 
+/**
+ * The sharp turns of a shape (caster space; aspect is width ÷ height): where it bends by more than
+ * about 55 degrees, the sharpest point of each bend, at most six and never two close together.
+ * Pure; tested.
+ */
+export function findCorners(x: ArrayLike<number>, y: ArrayLike<number>, n: number, aspect: number): number[] {
+  const out: number[] = [];
+  const turnAt = (j: number): number => {
+    const ax = (x[j] - x[j - 3]) * aspect, ay = y[j] - y[j - 3];
+    const bx = (x[j + 3] - x[j]) * aspect, by = y[j + 3] - y[j];
+    const la = Math.hypot(ax, ay), lb = Math.hypot(bx, by);
+    if (la < 1e-4 || lb < 1e-4) return 0;
+    return Math.acos(Math.max(-1, Math.min(1, (ax * bx + ay * by) / (la * lb))));
+  };
+  let lastAt = -99;
+  for (let i = 3; i < n - 3 && out.length < 6; i++) {
+    if (i - lastAt < 6 || turnAt(i) < 0.95) continue;
+    let best = i, bestTurn = turnAt(i);
+    for (let j = i + 1; j < Math.min(n - 3, i + 5); j++) {
+      const t = turnAt(j);
+      if (t > bestTurn) {
+        best = j;
+        bestTurn = t;
+      }
+    }
+    out.push(best);
+    lastAt = best;
+    i = best + 3;
+  }
+  return out;
+}
+
 /** Wet width for a tip speed in caster heights per second (pure; tested). */
 export function wetWidth(speed: number): number {
   return INK.minWidth + (INK.maxWidth - INK.minWidth) * Math.exp(-Math.max(0, speed) / INK.v0);
@@ -126,6 +158,8 @@ export class InkStroke {
   still = false;
   /** A voice-only sketch: drawn along its length while settling instead of morphed. */
   drawIn = false;
+  /** The settled shape's sharp turns (indices into it), found when first drawn settled. */
+  corners: number[] | null = null;
 
   constructor(public id: string, now: number, public readonly replay = false) {
     this.since = now;
@@ -303,6 +337,7 @@ export class InkLayer {
     s.from = resampleSamples(pts.map((p) => p.x), pts.map((p) => p.y), pts.map((p) => p.w), n, aspect);
     s.to = alignForMorph(s.from, samplesFromPoints(target, n, aspect), aspect);
     s.shape = { x: new Float32Array(n), y: new Float32Array(n), w: new Float32Array(n) };
+    s.corners = null;
     s.still = reducedMotion;
     s.state = reducedMotion ? 'settled' : 'settling';
     s.since = now;
@@ -580,6 +615,7 @@ export class InkLayer {
         ctx.lineWidth = Math.max(1, meanW * H * 0.42);
         this.path(ctx, view, n);
         ctx.stroke();
+        this.drawNodes(ctx, s, view, n, meanW * H, fade);
       }
       return;
     }
@@ -613,6 +649,9 @@ export class InkLayer {
       }
     }
 
+    // A settled shape that is fading (Obliviate forgets it) keeps its nodes while it fades.
+    if (!hc && s.state === 'fading' && s.morphK >= 1 && s.shape) this.drawNodes(ctx, s, view, n, meanW * H, fade);
+
     // 4. Listening ('spell.pending'): a soft glint travels along the ink until the decision. The
     //    ink is already lit, so the glint is what makes the waiting visible; it stays small.
     if (sc.glint && sprites) {
@@ -625,6 +664,50 @@ export class InkLayer {
       ctx.drawImage(sprites.glow('#FFFFFF'), gx - r, gy - r, r * 2, r * 2);
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
+    }
+  }
+
+  /**
+   * The settled shape as a figure of a spell, not a scribble: a ring where it begins, a point where
+   * it ends, and a small ring at each sharp turn. Opaque like the line (light fades by darkening).
+   * The turns are found once per shape (InkStroke.corners), so a frame allocates nothing.
+   */
+  private drawNodes(ctx: CanvasRenderingContext2D, s: InkStroke, view: View, n: number, w: number, fade: number): void {
+    if (n < 4 || w < 1) return;
+    const sc = this.scratch;
+    if (!s.corners) s.corners = findCorners(sc.x, sc.y, n, view.casterAspect);
+    ctx.lineWidth = Math.max(1, w * 0.32);
+    ctx.strokeStyle = inkColor('body', LEVELS - 1, fade);
+    ctx.fillStyle = inkColor('core', LEVELS - 1, fade);
+    // The start: a ring round a bright point.
+    const sx = view.px(sc.x[0]), sy = view.py(sc.y[0]);
+    ctx.beginPath();
+    ctx.arc(sx, sy, w * 1.55, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(sx, sy, w * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    // The end: a small lozenge pointing on along the stroke.
+    const ex = view.px(sc.x[n - 1]), ey = view.py(sc.y[n - 1]);
+    let dx = ex - view.px(sc.x[n - 4]), dy = ey - view.py(sc.y[n - 4]);
+    const len = Math.hypot(dx, dy) || 1;
+    dx /= len;
+    dy /= len;
+    ctx.beginPath();
+    ctx.moveTo(ex + dx * w * 2.1, ey + dy * w * 2.1);
+    ctx.lineTo(ex - dy * w * 0.95, ey + dx * w * 0.95);
+    ctx.lineTo(ex - dx * w * 0.7, ey - dy * w * 0.7);
+    ctx.lineTo(ex + dy * w * 0.95, ey - dx * w * 0.95);
+    ctx.closePath();
+    ctx.fill();
+    // A small ring at each sharp turn.
+    const corners = s.corners;
+    for (let k = 0; k < corners.length; k++) {
+      const i = corners[k];
+      if (i >= n) continue;
+      ctx.beginPath();
+      ctx.arc(view.px(sc.x[i]), view.py(sc.y[i]), w * 1.2, 0, Math.PI * 2);
+      ctx.stroke();
     }
   }
 

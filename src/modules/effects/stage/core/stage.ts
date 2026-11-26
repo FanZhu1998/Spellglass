@@ -5,7 +5,7 @@
 // Order of drawing each frame (both layers are cleared first):
 //   shade (normal blend): room dimming, vignette and glass sheen, the shelf and its props, dust and
 //          smoke, dull ink, text shadows
-//   light (screen blend): the ink trail, the tip, orbs and flashes, particles, bolts, the shield,
+//   light (screen blend): the ink trail, the cast's circle, the tip, orbs and flashes, particles, bolts, the shield,
 //          the creature, revealed traces, inscriptions, the practice guide
 //
 // Headless mode (no DOM, no timers) lets Node tests drive the same code through tick().
@@ -23,6 +23,7 @@ import {
 } from '../../../../kernel';
 import type { FrameInfo, Layers, PropView, Shelf, StageServices } from '../types';
 import { resolveAnchor, type AnchorContext, type XY } from './anchors';
+import { castColor, ConstructLayer, drawRevealRings, prewarmCircles, prewarmReveal } from './arcane';
 import { ClipCompositor } from './capture';
 import { isColor } from './color';
 import { Creature, CreatureRenderer } from './creature';
@@ -31,7 +32,7 @@ import { createStageDom, exposureFilter, type StageDom } from './dom';
 import { paintGlass, reflectionFilter } from './glass';
 import { InkLayer, type InkStroke, type InkStyle } from './ink';
 import { LightLayer } from './light';
-import { cleanText, scaleParticleCount, wrapText } from './limits';
+import { cleanText, prepareShield, scaleParticleCount, wrapText } from './limits';
 import { guidePath, pointAlong, settleTarget, toCurrentAspect } from './morph';
 import { drawThisFrame } from './pacing';
 import { ParticleSystem } from './particles';
@@ -42,7 +43,7 @@ import { createStepDefs, type StageWorld } from './runners';
 import { RevealControl, ShakeControl, TimeControl } from './scene-fx';
 import { buildSceneProps, scenePropsDiffer } from './scene-props';
 import { Scheduler } from './scheduler';
-import { Bolt, drawBolt, drawShield, Shield } from './shapes';
+import { Bolt, drawBolt, drawShield, prewarmWard, Shield } from './shapes';
 import { makeCanvas, Sprites } from './sprites';
 import { BUILT_IN_HIDDEN_INK, TextLayer } from './text';
 import { TipView } from './tip';
@@ -109,6 +110,10 @@ export class StageCore implements StageWorld {
   shields: Shield[] = [];
   bolts: Bolt[] = [];
   creatures: Creature[] = [];
+  /** The rune circles round casts (arcane.ts). */
+  readonly constructs = new ConstructLayer();
+  /** When Revelio's lens began to show, or null while no reveal shows (drawReveal). */
+  private revealLensAt: number | null = null;
   readonly time = new TimeControl();
   readonly shake: ShakeControl;
   readonly reveal = new RevealControl();
@@ -558,6 +563,8 @@ export class StageCore implements StageWorld {
       // No ink on the glass (voice only): sketch the gesture's clean shape at the aim.
       this.ink.sketch(`sketch-${cast.id}`, target, now, aspect, this.reduced);
     }
+    // A circle of the spell's own runes lights up round the settled shape.
+    if (target) this.constructs.cast(cast.id, target, castColor(entry?.spell.effect?.steps, isColor), cast.spellId, now, aspect, this.reduced);
   }
 
   private writeIncantation(cast: SpellCast, entry: SpellbookEntry | null, now: number): void {
@@ -746,10 +753,30 @@ export class StageCore implements StageWorld {
     if (!this.view.update(width, height, dpr, this.cameraAspect())) return;
     this.dom.resize(this.view);
     this.renderOverlay();
+    this.prewarmConstructs();
     this.particles.setAspect(this.view.casterAspect);
     if (this.guide.spellId && Math.abs(before - this.view.casterAspect) > 1e-6) this.showGuide(this.guide.spellId);
     this.publishSurface();
     this.markProps();
+  }
+
+  /**
+   * The costliest construct layers (Protego's ward, Revelio's lens), painted in idle time after each
+   * resize, so the first Protego or Revelio paints nothing as it blooms (Arcana.prewarm), and the
+   * first cast circle of each size warmed (Arcana.warm). The ward is Protego's own (shield.dome with
+   * its defaults); a pack's other wards paint when first drawn.
+   */
+  private prewarmConstructs(): void {
+    if (!this.dom) return;
+    const a = this.constructs.arcana;
+    // Only the sizes for the view as it is now (while a window is dragged, it changes every frame).
+    a.unwant();
+    const ward = prepareShield({ use: 'shield.dome' }, { scale: 1, reducedMotion: this.reduced, lasts: null });
+    prewarmWard(a, ward.color, ward.radius, this.view.height * this.view.dpr);
+    prewarmReveal(a, this.view);
+    // And a first cast circle at each size this view may draw one, so the first cast pays nothing.
+    prewarmCircles(a, this.view);
+    a.prewarm();
   }
 
   /** Sticky 'stage.surface': republished on resize, camera change and layer change. */
@@ -848,7 +875,7 @@ export class StageCore implements StageWorld {
    *  tests. */
   animating(now: number): boolean {
     if (this.replaySession || this.steeringCastId || this.clips.active || this.guide.path) return true;
-    if (this.particles.count > 0 || this.bolts.length || this.shields.length || this.creatures.length) return true;
+    if (this.particles.count > 0 || this.bolts.length || this.shields.length || this.creatures.length || this.constructs.animating()) return true;
     if (this.shake.active(now) || this.reveal.reveals.length || this.text.incantation || this.text.extras.length) return true;
     if (this.light.animating(now) || this.ink.animating(now)) return true;
     for (const a of this.directorInstance.ongoing()) {
@@ -893,6 +920,7 @@ export class StageCore implements StageWorld {
       if (this.creatures.some((c) => c.gone())) this.creatures = this.creatures.filter((c) => !c.gone());
       if (this.shields.some((s) => s.gone(now))) this.shields = this.shields.filter((s) => !s.gone(now));
       if (this.bolts.some((b) => b.done(now))) this.bolts = this.bolts.filter((b) => !b.done(now));
+      this.constructs.update(now, this.view.casterAspect, this.particles, (n) => scaleParticleCount(n, this.reduced));
       this.reveal.update(now);
       this.shake.update(now);
       this.text.update(now);
@@ -958,6 +986,8 @@ export class StageCore implements StageWorld {
     this.shields = [];
     this.bolts = [];
     this.creatures = [];
+    this.constructs.clear();
+    this.revealLensAt = null;
     this.time.clear();
     this.shake.clear();
     this.reveal.clear();
@@ -995,6 +1025,8 @@ export class StageCore implements StageWorld {
     const layers = this.layers;
     const f = this.frame;
     const style = this.inkStyle;
+    // The construct layers this frame draws are kept, and it may paint one (arcane.ts Arcana).
+    this.constructs.arcana.beginFrame();
     style.highContrast = this.highContrast;
     style.reducedMotion = this.reduced;
     style.quality = f.quality;
@@ -1015,19 +1047,21 @@ export class StageCore implements StageWorld {
     this.text.drawShade(S, v, now);
     if (this.highContrast && !this.replaySession) this.tip.drawShade(S, v, now, this.lostMs);
 
-    // Light layer.
+    // Light layer. The ink is opaque and fades by darkening, so it goes first: the cast's circle,
+    // which only adds light, is drawn over it and never has the fading shape cut out of it.
     this.ink.drawLight(L, v, now, style, this.sprites);
+    this.constructs.draw(L, v, now);
     if (this.replaySession) this.drawReplayTip(L);
     else this.tip.drawLight(L, v, this.sprites, now, this.lostMs, this.candleColor, this.reduced);
     this.light.drawLight(L, v, this.sprites, now, this.reduced);
     this.particles.draw(L, 'light', v, this.sprites);
     L.globalCompositeOperation = 'source-over';
-    for (const b of this.bolts) drawBolt(L, b, v, this.sprites, now, this.reduced);
-    for (const s of this.shields) drawShield(L, s, v, this.sprites, now, this.reduced);
-    for (const c of this.creatures) this.creatureRenderer.draw(L, c, v);
+    for (const b of this.bolts) drawBolt(L, b, v, this.sprites, now, this.reduced, this.constructs.arcana);
+    for (const s of this.shields) drawShield(L, s, v, this.sprites, now, this.reduced, this.constructs.arcana);
+    for (const c of this.creatures) this.creatureRenderer.draw(L, c, v, f.quality === 'low');
     this.drawReveal(L, now, reveal);
     this.text.drawLight(L, v, now);
-    this.guide.draw(L, v, this.sprites, now, this.candleColor, this.vellumColor);
+    this.guide.draw(L, v, this.sprites, now, this.candleColor, this.vellumColor, this.constructs.arcana);
     L.globalAlpha = 1;
     L.globalCompositeOperation = 'source-over';
   }
@@ -1065,6 +1099,15 @@ export class StageCore implements StageWorld {
   /** Revelio: the glass remembers. Recent casts' shapes shimmer faintly into view (with the theme's
    *  hidden ink, which its text.inscribe writes, and the props' hidden details). */
   private drawReveal(L: CanvasRenderingContext2D, now: number, alpha: number): void {
+    if (alpha > 0.01) {
+      // A lens of runes round the middle of the glass while it shows what is hidden. It turns from
+      // when it began to show, and keeps that while it shows: a second Revelio, or the first one
+      // ending under it, never makes it jump.
+      if (this.revealLensAt === null || now < this.revealLensAt) this.revealLensAt = now;
+      drawRevealRings(L, this.constructs.arcana, this.view, now - this.revealLensAt, alpha, this.reduced);
+    } else {
+      this.revealLensAt = null;
+    }
     const history = this.ink.history;
     if (alpha <= 0.01 || !history.length) return;
     const H = this.view.height * this.view.dpr;
@@ -1219,6 +1262,7 @@ export class StageCore implements StageWorld {
     while (!r.aborted && this.now() < deadline) {
       const ended = lasts === null || this.ended.has(cast.id);
       const busy = this.directorInstance.busy(cast.id) || this.creatures.some((c) => c.castId === cast.id) || this.shields.some((s) => s.castId === cast.id) ||
+        this.constructs.circles.some((c) => c.castId === cast.id) ||
         !this.shelfSettled();
       if (ended && !busy) break;
       await this.sleep(100);

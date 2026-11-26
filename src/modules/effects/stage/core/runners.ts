@@ -207,7 +207,12 @@ export function createStepDefs(w: StageWorld): Record<string, StepDef> {
       run(c) {
         const p = c.params as unknown as ShieldParams;
         // Around the caster: centred a little below the head so it holds head and shoulders.
-        const s = new Shield(c.cast.id, p, { x: CASTER_ANCHOR.x, y: CASTER_ANCHOR.y + 0.08 }, c.now);
+        const center = { x: CASTER_ANCHOR.x, y: CASTER_ANCHOR.y + 0.08 };
+        // A ward already up is renewed, not raised again (Shield.renews): the old one goes at once
+        // and the new one carries on its look, so the picture holds steady.
+        const prev = w.shields.find((o) => o.renews(p, center, c.now, c.cast.spellId));
+        const s = new Shield(c.cast.id, p, center, c.now, prev?.look, c.cast.spellId);
+        if (prev) prev.replaced = true;
         w.shields.push(s);
         return { held: p.hold, durationMs: p.duration_ms, finished: (t) => t >= s.until || s.endedAt !== null, stop: () => s.end(w.now()) };
       },

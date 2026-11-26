@@ -7,6 +7,7 @@
 
 import type { Point } from '../../../../contracts';
 import { geometry } from '../../../../kernel';
+import { type Arcana, circleFor, drawStencil, emblemLike } from './arcane';
 import { pointAlong } from './morph';
 import type { Sprites } from './sprites';
 import type { View } from './view';
@@ -15,6 +16,8 @@ import type { View } from './view';
 export const GUIDE_REST_START_MS = 550;
 export const GUIDE_REST_END_MS = 750;
 const ATTEMPT_SHOW_MS = 1700;
+/** The stencil behind the guide: faint, so the guide and the pace dot stay what you look at. */
+const GUIDE_STENCIL_ALPHA = 0.2;
 const ATTEMPT_FADE_MS = 450;
 const DASH: number[] = [];
 
@@ -50,6 +53,10 @@ export class PracticeGuide {
   slow = false;
   startedAt = 0;
   attempt: Attempt | null = null;
+  /** Where the stencil goes, for the path and aspect it was worked out for. */
+  private stencil: { x: number; y: number; radius: number } | null = null;
+  private stencilPath: Point[] | null = null;
+  private stencilAspect = 0;
   /** Scratch points, so drawing every frame allocates nothing. */
   private readonly a = { x: 0, y: 0 };
   private readonly b = { x: 0, y: 0 };
@@ -92,11 +99,21 @@ export class PracticeGuide {
     return this.slow ? this.paceMs * 2 : this.paceMs;
   }
 
-  draw(ctx: CanvasRenderingContext2D, view: View, sprites: Sprites, now: number, candle: string, vellum: string): void {
+  draw(ctx: CanvasRenderingContext2D, view: View, sprites: Sprites, now: number, candle: string, vellum: string, arcana?: Arcana): void {
     const path = this.path;
     if (!path) return;
     const H = view.height * view.dpr;
     const { f, phase } = paceFraction(now - this.startedAt, this.passMs);
+    // The spell's own circle, faint and still, behind the guide (arcane.ts drawStencil).
+    if (arcana && this.spellId) {
+      if (this.stencilPath !== path || this.stencilAspect !== view.casterAspect) {
+        // A shape that would make an emblem inside a ring has none (arcane.ts emblemLike).
+        this.stencil = emblemLike(path, view.casterAspect) ? null : circleFor(path, view.casterAspect);
+        this.stencilPath = path;
+        this.stencilAspect = view.casterAspect;
+      }
+      if (this.stencil) drawStencil(ctx, arcana, view, this.stencil, this.spellId, vellum, GUIDE_STENCIL_ALPHA);
+    }
     ctx.globalCompositeOperation = 'lighter';
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';

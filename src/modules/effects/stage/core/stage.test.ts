@@ -8,6 +8,7 @@ import type { FrameInfo, Layers, PropAction, PropView, Shelf, StageServices } fr
 import { MANIFEST } from '../index';
 import { createShelf } from '../props';
 import { MEND_MS } from '../props/teacup';
+import { CAST_CIRCLE } from './arcane';
 import { hasShape } from './ink';
 import { MAX_DIM_RATE_PER_MS } from './limits';
 import { REPLAY_TAIL_MS } from './replay';
@@ -543,6 +544,77 @@ describe('the casting moment', () => {
     expect(r.core.light.dims[0].amount).toBeCloseTo(0.56);
   });
 
+  it('lights a circle of the spell\'s own runes round the settled shape, in its color, then lets it go', async () => {
+    const r = await rig();
+    trace(r, 'stroke-1', upStroke);
+    r.cast('lumos', { strokeId: 'stroke-1' });
+    const circle = r.core.constructs.circles[0];
+    expect(circle?.castId).toBe('cast-1');
+    // Lumos's orb names no color, so the circle takes the orb's own.
+    expect(circle.color).toBe('#FFE7B3');
+    expect(circle.still).toBe(false);
+    r.advance(CAST_CIRCLE.holdMs + CAST_CIRCLE.outMs + 32);
+    expect(r.core.constructs.circles).toHaveLength(0);
+    // A fizzle is no cast: no circle.
+    trace(r, 'stroke-2', upStroke);
+    r.kernel.emit('spell.fizzle', { id: 'f1', t: r.now(), strokeId: 'stroke-2', reason: 'low-score', quality: 0.4 }, 'engine');
+    expect(r.core.constructs.circles).toHaveLength(0);
+  });
+
+  it('however fast the casts come, the circles\' light at the casting spot flashes no more than three times a second', async () => {
+    // Lumos and Nox in turn, all at one spot (a pen flicked up and down, or the incantations said
+    // fast): three, four and five casts a second. Every circle is round the same place, so a point
+    // on the rune band or on the figure may be lit by all of them: their light adds up there.
+    for (const frames of [19, 16, 12]) {
+      const r = await rig();
+      // Layers to draw (in Node nothing is painted), told apart by what they are.
+      const RING = { ring: true }, SIGIL = { sigil: true };
+      Object.assign(r.core.constructs.arcana, { ring: () => RING, sigil: () => SIGIL });
+      let ring = 0, sigil = 0, alpha = 1;
+      const ctx = {
+        get globalAlpha() { return alpha; },
+        set globalAlpha(v: number) { alpha = v; },
+        globalCompositeOperation: 'source-over',
+        save() {}, restore() {}, translate() {}, rotate() {}, scale() {}, beginPath() {}, moveTo() {}, arc() {}, closePath() {}, clip() {},
+        drawImage(img: unknown) {
+          if (img === RING) ring += alpha;
+          else if (img === SIGIL) sigil += alpha;
+        },
+      } as unknown as CanvasRenderingContext2D;
+      const rings: number[] = [], figures: number[] = [];
+      for (let i = 0; i < 20; i++) {
+        r.cast(i % 2 ? 'nox' : 'lumos', { via: 'voice' });
+        for (let k = 0; k < frames; k++) {
+          r.advance(16);
+          ring = 0;
+          sigil = 0;
+          r.core.constructs.draw(ctx, r.core.view, r.now());
+          rings.push(ring);
+          figures.push(sigil);
+        }
+      }
+      expect(Math.max(...rings), `every ${frames * 16} ms`).toBeGreaterThan(0.5);
+      expect(mostFlashesInASecond(rings, 16), `rings, every ${frames * 16} ms`).toBeLessThanOrEqual(EFFECT_LIMITS.flashesPerSecond);
+      expect(mostFlashesInASecond(figures, 16), `figures, every ${frames * 16} ms`).toBeLessThanOrEqual(EFFECT_LIMITS.flashesPerSecond);
+    }
+  });
+
+  it('Protego cast again renews its ward: one dome, carrying on the first one\'s look', async () => {
+    const r = await rig();
+    addSpells(r, [entry('protego', [{ use: 'shield.dome', duration_ms: 5000 }], 5000)]);
+    r.cast('protego');
+    r.advance(CAST_SEQUENCE.bloomDelayMs + 40);
+    const first = r.core.shields[0];
+    expect(first).toBeDefined();
+    r.advance(300);
+    const again = r.cast('protego');
+    r.advance(CAST_SEQUENCE.bloomDelayMs + 40);
+    expect(r.core.shields).toHaveLength(1);
+    expect(r.core.shields[0].castId).toBe(again.id);
+    expect(r.core.shields[0].look).toBe(first.look);
+    expect(first.replaced).toBe(true);
+  });
+
   it('a fizzle dulls and drips the ink; a steering or ignored fizzle only fades', async () => {
     const r = await rig();
     trace(r, 'stroke-1', upStroke);
@@ -578,6 +650,8 @@ describe('the casting moment', () => {
     const t0 = r.now();
     r.cast('lumos', { strokeId: 'stroke-1' });
     expect(r.core.ink.get('stroke-1')!.state).toBe('settled');
+    // The circle appears whole and holds still; it only fades.
+    expect(r.core.constructs.circles[0].still).toBe(true);
     expect(r.core.text.incantation!.still).toBe(true);
     expect(r.core.text.incantation!.start).toBe(t0);
     r.advance(16);

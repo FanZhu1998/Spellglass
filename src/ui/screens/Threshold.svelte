@@ -10,13 +10,13 @@
   import { focusOnMount, onEscape } from '../actions';
   import Icon from '../components/shell/Icon.svelte';
   import {
-    ROUTES, TEXT, TONE_GLYPH, cameraLine, cameraTrouble, currentRoute, routeUnavailable, trackerLine,
+    ROUTES, TEXT, TONE_GLYPH, cameraLine, cameraTrouble, currentRoute, handModeFor, handRoute, routeInfo, routeUnavailable, trackerLine,
     type Route, type StatusLine,
   } from '../components/shell/routes';
 
   let { app }: { app: AppState } = $props();
 
-  const ICON: Record<Route, string> = { wand: 'wand', hand: 'hand', infrared: 'infrared', pointer: 'pointer' };
+  const ICON: Record<Route, string> = { wand: 'wandHand', hand: 'hand', glint: 'wand', infrared: 'infrared', pointer: 'pointer' };
 
   /** A returning player came here to change the route: start from the one in use. */
   const returning = untrack(() => app.settings['app.onboarded'] === true);
@@ -50,7 +50,7 @@
   const usesCamera = $derived(chosen !== null && chosen !== 'pointer');
   const trouble = $derived(usesCamera && cameraTrouble(app.camera));
   const trackerFailed = $derived(
-    usesCamera && !trouble && app.tracker?.state === 'error' && app.tracker.tracker === (chosen === 'hand' ? 'tracker.hand' : 'tracker.bright-tip'),
+    usesCamera && !trouble && chosen !== null && app.tracker?.state === 'error' && app.tracker.tracker === routeInfo(chosen).tracker,
   );
 
   /** What the mirror is doing with the choice, line by line. */
@@ -65,9 +65,9 @@
     if (app.camera?.state === 'on') {
       const line = trackerLine(t, chosen);
       if (line) out.push(line);
-    } else if (chosen === 'hand' && !trouble && t?.tracker === 'tracker.hand' && (t.state === 'loading' || t.state === 'error')) {
+    } else if (handRoute(chosen) && !trouble && t?.tracker === 'tracker.hand' && (t.state === 'loading' || t.state === 'error')) {
       // The model downloads while the camera opens.
-      const line = trackerLine(t, 'hand');
+      const line = trackerLine(t, chosen);
       if (line) out.push(line);
     }
     return out;
@@ -88,7 +88,7 @@
   // The player's choice of route A or C wins, and is saved with the camera so it holds next time.
   $effect(() => {
     const route = chosen;
-    if (route !== 'wand' && route !== 'infrared') return;
+    if (route !== 'glint' && route !== 'infrared') return;
     const profile = route === 'infrared' ? 'infrared' : 'visible';
     return on(app.kernel, 'camera.ready', () => keepProfile(profile));
   });
@@ -115,8 +115,13 @@
         await app.set('capture.mirror', false);
         return;
       }
-      const tracker = route === 'hand' ? 'tracker.hand' : 'tracker.bright-tip';
-      if (route !== 'hand') await app.set('brightTip.profile', route === 'infrared' ? 'infrared' : 'visible');
+      const info = routeInfo(route);
+      const tracker = info.tracker;
+      // The route's own settings first (the hand tracker's mode, the bright tip's profile), so the tracker
+      // starts in the right one. The hand route keeps a player's choice of the knuckles (handModeFor).
+      const mode = handModeFor(route, app.settings['hand.mode']);
+      if (mode) await app.set('hand.mode', mode);
+      if (info.settings?.['brightTip.profile']) await app.set('brightTip.profile', info.settings['brightTip.profile']);
       await app.set('capture.mirror', true);
       // Section 11.2: this is the moment the browser asks for the camera.
       await app.set('capture.consent', true);
@@ -125,7 +130,7 @@
       if (app.kernel.modules().find((m) => m.manifest.id === tracker)?.state === 'error') {
         await ask(app.kernel, 'modules.restart', { id: tracker });
       }
-      if (route !== 'hand' && app.camera?.state === 'on') keepProfile(route === 'infrared' ? 'infrared' : 'visible');
+      if (info.settings?.['brightTip.profile'] && app.camera?.state === 'on') keepProfile(info.settings['brightTip.profile']);
     } catch (err) {
       problem = describeError(err).message;
     } finally {
@@ -146,7 +151,8 @@
   }
 
   async function restartTracker() {
-    const id = chosen === 'hand' ? 'tracker.hand' : 'tracker.bright-tip';
+    if (!chosen) return;
+    const id = routeInfo(chosen).tracker;
     retrying = true;
     try {
       await ask(app.kernel, 'modules.restart', { id });
@@ -191,8 +197,8 @@
       <h3 id="route-title">How should the app see your wand?</h3>
       <p class="why">
         {app.desktop
-          ? 'The first three use your camera. Your computer may ask you to allow it once.'
-          : 'The first three use your camera, so the browser will ask you to allow it.'}
+          ? 'All but the last use your camera. Your computer may ask you to allow it once.'
+          : 'All but the last use your camera, so the browser will ask you to allow it.'}
       </p>
       <div class="routes" role="group" aria-labelledby="route-title">
         {#each ROUTES as r (r.id)}
@@ -247,7 +253,7 @@
             </div>
           {/if}
 
-          {#if chosen === 'wand'}
+          {#if chosen === 'glint'}
             <label class="switch light-switch">
               <input
                 type="checkbox"
@@ -256,7 +262,7 @@
               />
               <span>No light to hand? Light the tip with a white band across the top of the screen.</span>
             </label>
-          {:else if chosen === 'hand'}
+          {:else if chosen === 'hand' || chosen === 'wand'}
             <p class="hand-note">{TEXT.followingCamera}</p>
           {/if}
         </div>

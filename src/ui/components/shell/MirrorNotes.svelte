@@ -43,9 +43,10 @@
     if (route !== 'pointer' && t && t.tracker === s['tracker.active']) {
       if (t.state === 'error') return { kind: 'tracker-error', tone: 'error', text: trackerLine(t, route)?.text ?? 'The tracker stopped.' };
       if (t.hint === 'tip-not-found') return { kind: 'hint', tone: 'warn', text: TEXT.tipNotFound };
-      if (t.hint === 'hand-not-found') return { kind: 'hint', tone: 'warn', text: TEXT.handNotFound };
+      if (t.hint === 'hand-not-found') return { kind: 'hint', tone: 'warn', text: route === 'wand' ? TEXT.wandHandNotFound : TEXT.handNotFound };
       if (t.hint === 'hand-too-small') return { kind: 'hint', tone: 'warn', text: TEXT.handTooSmall };
       if (t.hint === 'too-many-lights') return { kind: 'hint', tone: 'warn', text: TEXT.tooManyLights };
+      if (t.hint === 'wand-not-seen') return { kind: 'hint', tone: 'warn', text: TEXT.wandNotSeen };
       if (t.state === 'loading' && t.tracker === 'tracker.hand') {
         const line = trackerLine(t, route);
         if (line) return { kind: 'progress', tone: 'wait', text: line.text, progress: line.progress ?? 0 };

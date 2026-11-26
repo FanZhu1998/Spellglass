@@ -162,6 +162,8 @@
         return 'Your hand looks small to the camera. Step closer, or zoom the camera in.';
       case 'too-many-lights':
         return 'Too many bright lights in view. Dim the lamps behind you, or tune the wand.';
+      case 'wand-not-seen':
+        return 'Hand found, but not the wand. Hold it up across the camera, not pointed at it.';
       default:
         return null;
     }

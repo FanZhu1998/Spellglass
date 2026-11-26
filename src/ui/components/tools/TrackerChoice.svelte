@@ -1,17 +1,18 @@
 <script module lang="ts">
-  export type Route = 'wand' | 'infrared' | 'hand' | 'pointer';
+  export type Route = 'wand' | 'hand' | 'glint' | 'infrared' | 'pointer';
 
   export const ROUTES: { id: Route; tracker: string; title: string; line: string }[] = [
-    { id: 'wand', tracker: 'tracker.bright-tip', title: 'Wand tip', line: 'Follows the glint of the tip. Needs a light beside the lens.' },
-    { id: 'infrared', tracker: 'tracker.bright-tip', title: 'Infrared camera', line: 'The same, for a camera with infrared lights.' },
+    { id: 'wand', tracker: 'tracker.hand', title: 'Wand tip', line: 'Finds the hand that holds the wand, then the wand. Room light will do.' },
     { id: 'hand', tracker: 'tracker.hand', title: 'Hand', line: 'Follows your hand or fingertip. No wand needed.' },
+    { id: 'glint', tracker: 'tracker.bright-tip', title: 'Glint of the tip', line: 'Follows the lit tip alone. Needs a light beside the lens and a dim room.' },
+    { id: 'infrared', tracker: 'tracker.bright-tip', title: 'Infrared camera', line: 'The glint, for a camera with infrared lights.' },
     { id: 'pointer', tracker: 'tracker.pointer', title: 'Mouse or touch', line: 'Draw on the mirror. No camera needed.' },
   ];
 </script>
 
 <script lang="ts">
-  // The four ways the app can see your wand (Section 4 routes A, C and B, plus pointer mode), as one
-  // radio group. Native radios keep arrow-key movement and form semantics.
+  // The ways the app can see your wand (the wand in the hand, Section 4 routes B, A and C, plus pointer
+  // mode), as one radio group. Native radios keep arrow-key movement and form semantics.
   let {
     value,
     disabled = {},
@@ -34,6 +35,13 @@
       <input type="radio" name="tracker-route" value={r.id} checked={value === r.id} disabled={!!off || busy} onchange={() => onselect(r.id)} />
       <svg class="glyph" viewBox="0 0 40 40" width="40" height="40" aria-hidden="true">
         {#if r.id === 'wand'}
+          <!-- A fist holding a wand, its tip lit. -->
+          <path d="M16.5 21.5 L30 8" class="wand" />
+          <circle cx="31.5" cy="6.5" r="2" class="tip" />
+          <path d="M9 20.5 C9 18.3 10.9 16.8 13 17.3 L19.4 18.9 C21.4 19.4 22.5 21.4 21.9 23.4 L20.6 27.6 C19.8 30.2 17.1 31.6 14.5 30.8 L12.4 30.2 C9.9 29.4 8.5 26.8 9.3 24.3 Z" />
+          <path d="M10.6 23.2 L19 25.5 M10.2 26.7 L17.3 28.6" />
+          <path d="M12.6 30.6 L8 36" />
+        {:else if r.id === 'glint'}
           <path d="M7 33 L25 15" class="wand" />
           <circle cx="27.5" cy="12.5" r="3" class="tip" />
           <path d="M27.5 4 V7 M36 12.5 H33 M33.5 6.5 L31.4 8.6 M21.5 6.5 L23.6 8.6 M33.5 18.5 L31.4 16.4" />

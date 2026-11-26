@@ -63,7 +63,9 @@ export interface Point2 {
   y: number;
 }
 
-export type HandMode = 'finger' | 'grip';
+/** 'wand': the tip of the wand held in the hand, found in the frame (wand.ts, tracking.ts WandTip); before the
+ *  wand has been seen, the grip projection stands in for it. */
+export type HandMode = 'finger' | 'grip' | 'wand';
 
 const KNUCKLES = [LANDMARK.INDEX_MCP, LANDMARK.MIDDLE_MCP, LANDMARK.RING_MCP, LANDMARK.PINKY_MCP] as const;
 
@@ -162,8 +164,9 @@ export function gripTip(lm: FlatLandmarks, reach: number, aspect: number): Point
   return { x: tx, y: ty * aspect };
 }
 
-/** The tip for the current mode, in frame-normalized coordinates (not yet flipped). */
-export function tipFor(lm: FlatLandmarks, mode: HandMode, reach: number, aspect: number): Point2 {
+/** The tip for finger or grip mode, in frame-normalized coordinates (not yet flipped). Wand mode needs the
+ *  frame as well as the landmarks: tracking.ts WandTip. */
+export function tipFor(lm: FlatLandmarks, mode: Exclude<HandMode, 'wand'>, reach: number, aspect: number): Point2 {
   return mode === 'grip' ? gripTip(lm, reach, aspect) : fingerTip(lm);
 }
 

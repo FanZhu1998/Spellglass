@@ -4,7 +4,10 @@
 
 import type { CameraStatus, ModuleManifest, ModuleState, SettingsMap, TrackerStatus } from '../../../contracts';
 
-export type Route = 'wand' | 'hand' | 'infrared' | 'pointer';
+/** 'wand' follows the wand in the hand that holds it (the hand tracker's wand mode); 'glint' the lit tip
+ *  alone (the bright-tip tracker with a light beside the lens, route A); 'infrared' the same with an infrared
+ *  camera (route C); 'hand' the hand or fingertip (route B); 'pointer' the mouse or a finger on the glass. */
+export type Route = 'wand' | 'hand' | 'glint' | 'infrared' | 'pointer';
 
 export interface RouteInfo {
   id: Route;
@@ -14,6 +17,8 @@ export interface RouteInfo {
   desktopText?: string;
   /** Module that must be usable for this route. */
   tracker: 'tracker.bright-tip' | 'tracker.hand' | 'tracker.pointer';
+  /** What else the route sets: the bright tip's profile. (The hand tracker's mode goes by handModeFor.) */
+  settings?: { 'brightTip.profile'?: 'visible' | 'infrared' };
   camera: boolean;
 }
 
@@ -21,16 +26,25 @@ export const ROUTES: readonly RouteInfo[] = [
   {
     id: 'wand',
     title: 'The tip of my wand',
-    text: 'A small light touching the bezel beside the lens makes the tip glint. Best in a dim room.',
-    tracker: 'tracker.bright-tip',
+    text: 'Hold your wand up in front of you: the camera finds the hand that holds it, then the wand. Ordinary room light will do. A 23 MB model downloads once.',
+    desktopText: 'Hold your wand up in front of you: the camera finds the hand that holds it, then the wand. Ordinary room light will do.',
+    tracker: 'tracker.hand',
     camera: true,
   },
   {
     id: 'hand',
     title: 'My hand or finger',
-    text: 'No extra kit: your index finger is the wand. A 23 MB model downloads once.',
-    desktopText: 'No extra kit: your index finger is the wand. Its model comes with the app.',
+    text: 'No wand needed: your index finger is the wand. A 23 MB model downloads once.',
+    desktopText: 'No wand needed: your index finger is the wand. Its model comes with the app.',
     tracker: 'tracker.hand',
+    camera: true,
+  },
+  {
+    id: 'glint',
+    title: "The glint of my wand's tip",
+    text: 'A small light touching the bezel beside the lens makes the tip glint, and the camera follows the glint alone. Best in a dim room.',
+    tracker: 'tracker.bright-tip',
+    settings: { 'brightTip.profile': 'visible' },
     camera: true,
   },
   {
@@ -38,6 +52,7 @@ export const ROUTES: readonly RouteInfo[] = [
     title: 'An infrared camera',
     text: 'A camera ringed with infrared lights, as in the parks. The steadiest choice.',
     tracker: 'tracker.bright-tip',
+    settings: { 'brightTip.profile': 'infrared' },
     camera: true,
   },
   {
@@ -52,9 +67,39 @@ export const ROUTES: readonly RouteInfo[] = [
 /** The route the settings describe now. */
 export function currentRoute(s: SettingsMap): Route {
   const t = s['tracker.active'];
-  if (t === 'tracker.hand') return 'hand';
-  if (t === 'tracker.bright-tip') return s['brightTip.profile'] === 'infrared' ? 'infrared' : 'wand';
+  if (t === 'tracker.hand') return s['hand.mode'] === 'wand' ? 'wand' : 'hand';
+  if (t === 'tracker.bright-tip') return s['brightTip.profile'] === 'infrared' ? 'infrared' : 'glint';
   return 'pointer';
+}
+
+/** A route's description. */
+export function routeInfo(id: Route): RouteInfo {
+  return ROUTES.find((r) => r.id === id) ?? ROUTES[ROUTES.length - 1];
+}
+
+/** The route follows the hand (and the wand in it, in wand mode): the hand tracker's lines apply. */
+export function handRoute(route: Route): boolean {
+  return routeInfo(route).tracker === 'tracker.hand';
+}
+
+/**
+ * The hand tracker's mode a route asks for, given the mode now, or null to leave it as it is. The wand
+ * route is wand mode. The hand route keeps the player's own choice of the fingertip or the point past the
+ * knuckles (Wand tuning), unless it comes from wand mode, which it turns to the fingertip. The Threshold
+ * and Wand tuning both choose routes through this, so they cannot disagree.
+ */
+export function handModeFor(route: Route, current: unknown): 'wand' | 'finger' | null {
+  if (route === 'wand') return current === 'wand' ? null : 'wand';
+  if (route === 'hand') return current === 'wand' ? 'finger' : null;
+  return null;
+}
+
+/** The hand tracker in wand mode has found the wand (contracts 1.3 TrackerStatus.wand): seen in half or
+ *  more of the last second's frames with a hand, or its place in the hand learned. Not learned alone: fair finds, or finds
+ *  on a hand the model is unsure of, are followed without teaching the place. */
+export function wandFound(t: TrackerStatus | null | undefined): boolean {
+  const w = t?.wand;
+  return !!w && (w.learned || w.seen >= 0.5);
 }
 
 type ModuleRow = { manifest: ModuleManifest; state: ModuleState; reason?: string };
@@ -72,7 +117,7 @@ export function routeUnavailable(route: RouteInfo, modules: readonly ModuleRow[]
       ? 'This browser cannot open a camera.'
       : 'Cameras need a secure address. Open Spellglass from its https link, or on localhost.';
   }
-  if (route.id === 'hand') return 'This browser cannot run the hand model.';
+  if (route.tracker === 'tracker.hand') return 'This browser cannot run the hand model.';
   return 'Not available in this browser.';
 }
 
@@ -99,6 +144,10 @@ export const TEXT = {
   openingDesktop: 'Opening the camera. If your computer asks, choose Allow.',
   tipNotFound: 'Wand tip not found. Point the tip at the camera and switch on the light beside the lens.',
   handNotFound: 'Hand not found. Hold your hand up where the camera can see it, in good light.',
+  /** The wand route: the hand that holds the wand is what the camera looks for first. */
+  wandHandNotFound: 'Hand not found. Hold the wand up where the camera can see it, and the hand holding it, in good light.',
+  /** The hand tracker's 'wand-not-seen' (contracts 1.3): the hand is held, but no wand found in it for 3 s. */
+  wandNotSeen: 'Hand found, but not the wand. Hold it up across the camera, not pointed at it, with a plain wall behind if you can.',
   /** The hand tracker's 'hand-too-small' (contracts 1.2): wrist to middle knuckle under 5% of the frame's width. */
   handTooSmall: 'Your hand looks small to the camera. Step closer, or zoom the camera in.',
   /** Webcams that track the player (the Insta360 Link 2, for one) pan and zoom the picture under the tip. */
@@ -178,10 +227,10 @@ export function cameraLine(c: CameraStatus | null | undefined, desktop = false):
 /** One plain sentence for the tracker of a route, or null when there is nothing to say. */
 export function trackerLine(t: TrackerStatus | null | undefined, route: Route): StatusLine | null {
   if (route === 'pointer') return { tone: 'ok', text: 'Mouse or touch is ready. Press on the mirror, trace a spell, then let go.' };
-  const want = route === 'hand' ? 'tracker.hand' : 'tracker.bright-tip';
+  const want = routeInfo(route).tracker;
   if (!t || t.tracker !== want) return { tone: 'wait', text: route === 'hand' ? 'Starting the hand tracker.' : 'Starting the wand tracker.' };
   if (t.state === 'error') return { tone: 'error', text: t.message || (route === 'hand' ? 'The hand tracker stopped.' : 'The wand tracker stopped.') };
-  if (route === 'hand') {
+  if (handRoute(route)) {
     if (t.state === 'loading') {
       // The percentage goes in the progress bar, not the sentence: a live region would read every step.
       const p = typeof t.progress === 'number' ? Math.max(0, Math.min(1, t.progress)) : 0;
@@ -190,6 +239,17 @@ export function trackerLine(t: TrackerStatus | null | undefined, route: Route): 
     }
     // Said while the hand is found, too: a small hand is found in fewer and fewer frames.
     if (t.hint === 'hand-too-small') return { tone: 'warn', text: TEXT.handTooSmall };
+    if (route === 'wand') {
+      if (t.hint === 'wand-not-seen') return { tone: 'warn', text: TEXT.wandNotSeen };
+      if (t.state === 'tracking') {
+        return wandFound(t)
+          ? { tone: 'ok', text: 'Wand found. Hold still, then trace a spell.' }
+          : { tone: 'wait', text: 'Hand found. Now hold the wand up so the camera sees all of it.' };
+      }
+      if (t.hint === 'hand-not-found') return { tone: 'warn', text: TEXT.wandHandNotFound };
+      if (t.state === 'starting') return { tone: 'wait', text: 'The wand tracker is waiting for the camera.' };
+      return { tone: 'wait', text: 'Looking for your wand. Hold it up where the camera can see it.' };
+    }
     if (t.state === 'tracking') return { tone: 'ok', text: 'Hand found. Your index finger is the wand.' };
     if (t.hint === 'hand-not-found') return { tone: 'warn', text: TEXT.handNotFound };
     if (t.state === 'starting') return { tone: 'wait', text: 'The hand tracker is waiting for the camera.' };

@@ -51,8 +51,31 @@ export type ToWorker =
       preview: boolean;
       /** Mirror the preview into caster orientation (setting 'capture.flipX'). */
       flipX: boolean;
+      /** Wand mode (hand.mode 'wand'): after the landmarks, find the wand in the hand (wand.ts), starting
+       *  from the tip's place in the hand that the tracker has learned, or anywhere when it has none. */
+      wand?: { prior: { a: number; b: number } | null };
     }
   | { type: 'close'; run: number };
+
+/** The wand the worker found in a frame (wand.ts WandFound), in the landmarks' units: normalized to the
+ *  frame, unmirrored. */
+export interface WandWire {
+  tip: [number, number];
+  /** Where the visible shaft leaves the hand. */
+  base: [number, number];
+  /** 0..1 (wand.ts). */
+  quality: number;
+  /** Mean contrast of the shaft against what is behind it, luma levels. */
+  contrast: number;
+  /** Visible length ÷ palm length. */
+  length: number;
+  /** The shaft ran out of the frame: the tip may be further on. */
+  cut: boolean;
+  /** A lit tip (a light beside the lens): a small bright spot at the end of the shaft. */
+  glint?: [number, number];
+  /** Found around the prior, or by searching every direction. */
+  search: 'prior' | 'wide';
+}
 
 /** One hand as the model saw it. */
 export interface HandWire {
@@ -85,6 +108,11 @@ export type FromWorker =
       /** Worker time for this frame (detectForVideo), ms. Not a timestamp. The tracker also judges a GPU
        *  delegate by it (index.ts, a slow GPU). */
       stepMs: number;
+      /** Wand mode: the wand found, or null when there was none to be sure of (absent outside wand mode). */
+      wand?: WandWire | null;
+      /** Wand mode: worker time spent reading the pixels and finding the wand, ms (not part of stepMs, which
+       *  judges the model's delegate). */
+      wandMs?: number;
       /** Mirrored preview for 'tracker.debug', transferred. */
       preview?: ImageBitmap;
     }

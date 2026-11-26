@@ -64,7 +64,9 @@ export interface SettingsMap {
   'brightTip.profile': 'visible' | 'infrared';
 
   // Hand tracker (7.3)
-  'hand.mode': 'finger' | 'grip';
+  // 'wand' (@since 1.3): the tip of the wand held in the hand, found in the frame; the grip projection
+  // (gripReach) stands in until the wand has been seen.
+  'hand.mode': 'finger' | 'grip' | 'wand';
   'hand.gripReach': number;               // how far past the knuckles the virtual tip sits, in hand lengths
 
   // Filter and segmenter (7.4)
@@ -269,5 +271,7 @@ export const DEFAULT_SETTINGS: SettingsMap = {
  *  debug view running (Section 13 performance budget). */
 export const EPHEMERAL_SETTINGS: readonly SettingKey[] = ['tracker.debug', 'diagnostics.overlay'];
 
-/** Version of the stored settings shape; bump and add a migration when it changes. */
-export const SETTINGS_VERSION = 1;
+/** Version of the stored settings shape; bump and add a migration when it changes (kernel/settings.ts
+ *  SETTINGS_MIGRATIONS). 2: "The tip of my wand" is the hand tracker's wand mode (contracts 1.3), and
+ *  settings that chose it under 1 (the bright tip, visible profile) move there. */
+export const SETTINGS_VERSION = 2;

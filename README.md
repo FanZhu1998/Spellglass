@@ -16,7 +16,7 @@ The desktop app is Spellglass in one file: no browser, no internet connection, n
 
 **Mac.** Open `Spellglass-0.1.0-mac.dmg` and drag Spellglass onto Applications, then open it from there. It runs on Apple silicon and Intel Macs alike. Until the app is signed, macOS refuses it the first time ("Apple could not verify…"): open **System Settings › Privacy & Security**, scroll to the message about Spellglass, choose **Open Anyway** and confirm. After that it opens like any other app. `Spellglass-0.1.0-mac.zip` holds the same app, for those who prefer it to a disk image.
 
-**The camera.** The first time you choose a camera route on a Mac, macOS asks whether Spellglass may use the camera: choose Allow (if you chose not to, turn Spellglass on in System Settings › Privacy & Security › Camera). Windows does not ask, but desktop apps must be allowed the camera in Settings › Privacy & security › Camera. Casting with your hand? See [Playing with your hand](#playing-with-your-hand) for the camera features to turn off.
+**The camera.** The first time you choose a camera route on a Mac, macOS asks whether Spellglass may use the camera: choose Allow (if you chose not to, turn Spellglass on in System Settings › Privacy & Security › Camera). Windows does not ask, but desktop apps must be allowed the camera in Settings › Privacy & security › Camera. Casting with a wand or your hand? See [Playing with your wand](#playing-with-your-wand) and [Playing with your hand](#playing-with-your-hand) for how to hold it and the camera features to turn off.
 
 - **F11** turns full screen on and off (on a Mac: Control-Command-F, or the green button). With integrated graphics on a 4K screen, full screen can be more than the GPU draws in time: measured on one such machine, about 36 frames a second and the trail 84 ms behind the camera, against 60 and 31 ms in the default window. If casting feels sluggish there, play in a window.
 - Progress, drawings, keepsakes and settings stay on the computer (`%APPDATA%\Spellglass` on Windows, `~/Library/Application Support/Spellglass` on a Mac) and survive closing the app and new versions of it. They are separate from Spellglass in a browser: to move them, use Workshop › Your data › Export my data, and import the file on the other side.
@@ -76,7 +76,7 @@ You need Node 22 or later and Chrome or Edge on a laptop or desktop.
 
 ```sh
 npm install
-npm run models      # optional: the hand-tracking model (about 8 MB) for "My hand or finger"
+npm run models      # optional: the hand-tracking model (about 8 MB) for "The tip of my wand" and "My hand or finger"
 npm run dev         # then open http://localhost:5173
 ```
 
@@ -86,9 +86,10 @@ The first visit asks how the app should see your wand:
 
 | Route | You need | How it works |
 |---|---|---|
-| The tip of my wand | A small light touching the bezel beside the lens (a phone flashlight works), or the white screen band from Wand tuning | The tip reflects light straight back toward its source, so it becomes the brightest dot in the frame |
+| The tip of my wand | The wand, in ordinary room light | A hand-landmark model finds the hand that holds the wand; around it, the frame shows the wand as a thin bar leaving the fist, and the bar's far end is the tip ([more](#playing-with-your-wand)) |
 | My hand or finger | Nothing | A hand-landmark model follows your index fingertip |
-| An infrared camera | A USB camera with infrared LEDs around the lens | The same as the first route, in a band where the room is dark |
+| The glint of my wand's tip | A small light touching the bezel beside the lens (a phone flashlight works), or the white screen band from Wand tuning, and a dim room | The tip reflects light straight back toward its source, so it becomes the brightest dot in the frame |
+| An infrared camera | A USB camera with infrared LEDs around the lens | The same as the glint, in a band where the room is dark |
 | Mouse or touch | Nothing, no camera | Press, trace, release |
 
 To cast: **hold still, trace the spell, hold still again.** Small, slow gestures from the wrist work best. Clear an arm's length plus the wand around you.
@@ -98,6 +99,27 @@ Access (Workshop › Settings): seated play (a smaller play area, lower in the v
 ### Can your camera see the wand tip?
 
 Start with the one-evening test in Appendix A of the blueprint. The tip finder at `/tools/tip-finder.html` (`http://localhost:5173/tools/tip-finder.html` while `npm run dev` runs) shows what the tracker sees and the tip's brightness against the brightest background (aim for 3× or more). It can also record a 10-second session as a test fixture. It shares the app's settings on purpose, so the threshold and exposure you find become the app's starting values.
+
+### Playing with your wand
+
+"The tip of my wand" finds the wand itself, with no light by the lens and no dark room. The hand-landmark model finds the hand that holds the wand; in the picture around that hand, the wand is a thin, straight bar, darker or lighter than what is behind it, leaving the fist, and its far end is the tip. The tracker learns where the tip sits in your hand, so when a fast stroke smears the shaft (at 30 frames a second, a quick flick always does) the tip is carried on the hand, turning as your wrist turns, and when the shaft is seen again the tip goes straight back to it. If the tip is lit, by a light beside the lens as for the glint, the glint at the end of the shaft marks it more exactly.
+
+- **Hold the wand across the camera's view**, not pointed at it: pointed at the lens, the shaft shrinks to a stub the camera cannot measure.
+- **Give it something to stand out against.** A dark wand in front of a pale wall is easy; in front of dark clothes, much harder. If the mirror says "Hand found, but not the wand", move so the wand has a plainer background, or light the room more.
+- The tips for the hand below apply too, above all turning off a webcam's own tracking, framing and HDR.
+- **Wand tuning** shows what it sees: the hand's landmarks, the shaft it found drawn over the picture, and how often the wand was seen in the last second.
+
+If you chose "The tip of my wand" in an earlier version, which followed the glint alone, the app moves you to this route; "The glint of my wand's tip" is still there for a light beside the lens in a dim room, and the infrared camera keeps its own route.
+
+How it was measured: on clips of a real fist photo (MediaPipe's test picture of a thumbs-up, turned so the forearm points down) holding a drawn wand, moved so the wand's tip traces the spells' paths while the wrist tilts the wand, through the real app and hand model, at 1280 × 720 and 30 frames a second. Five clips (sharp; smeared by a 1/60 s and by a 1/30 s exposure; with tremor and a wobbling hand; with a lit tip) of 20 casts each:
+
+| | The tip of my wand | The old guess past the knuckles (grip mode) |
+|---|---|---|
+| Spells cast right | 98 of 100 | 77 of 100 |
+| Tip's distance from the true tip while tracing, median (95th percentile) | 0.0004 to 0.003 frame widths (0.012 at most) | 0.134 frame widths (0.152) |
+| Frames of a stroke in which the shaft was seen | 80% (1/30 s) to 100% (sharp); the rest carried on the hand | none |
+
+The two it missed were the same Protego in the sharp clip, where the hand model lost the hand photo during the still beat before it, which grip mode missed as well. Finding the wand adds about 2.5 ms a frame in the hand worker (6.5 ms at the 95th percentile), on top of the hand model's 17 to 35 ms.
 
 ### Playing with your hand
 
@@ -153,7 +175,8 @@ camera → capture → tracker → filter and segmenter → recognizer → spell
                                               voice ↗
 ```
 
-- `src/contracts/` holds the only things modules share: data types, events, requests, settings, pack formats and JSON Schemas. Contract 1.2 is the blueprint's 1.0 plus additive fields, each marked `@since 1.1` or `@since 1.2` (1.2 adds a tracker's segmentation needs and the 'hand-too-small' hint to `tracker.status`, and the same needs to a recorded session, so that it replays as it played).
+- `src/contracts/` holds the only things modules share: data types, events, requests, settings, pack formats and JSON Schemas. Contract 1.3 is the blueprint's 1.0 plus additive fields, each marked `@since 1.1`, `@since 1.2` or `@since 1.3` (1.2 adds a tracker's segmentation needs and the 'hand-too-small' hint to `tracker.status`, and the same needs to a recorded session, so that it replays as it played; 1.3 adds the hand tracker's wand mode: the 'wand-not-seen' hint and a `wand` readout in `tracker.status`, and the shaft found in `tracker.debug`). A wand tip is published as a `TipSample` like any other, so nothing after the tracker changed. Settings are at version 2: the step from 1 moves "The tip of my wand" from the glint to the wand in the hand (`SETTINGS_MIGRATIONS` in `src/kernel/settings.ts`).
+- The wand finder is `src/modules/trackers/hand/wand.ts`: pure functions over the brightness of the region around the hand, which the hand worker reads from the camera frame after the landmarks (`luma.ts`). Lines through the grip are voted for by the edges outside the hand (a Hough transform kept to the lines a held wand can lie on), and each is checked along its length for a bar against both sides. `tracking.ts` (`WandTip`) keeps the tip in the hand's own frame from frame to frame. A better finder later, a learned one say, only has to return the same `WandWire` (`protocol.ts`).
 - `src/kernel/` holds the bus (run to completion), the module registry and lifecycle, feature detection, settings, named requests and the pack loader, and the frame feed both camera trackers read the camera track through where Chromium allows it (`frame-feed.ts`).
 - `src/modules/` holds one folder per module. Modules never import each other; `npm run lint:deps` fails the build if one does.
 - `src/ui/` is the Svelte 5 shell. It talks to the kernel, never to modules.
@@ -184,12 +207,13 @@ Developer pages that are not part of the build: the stage harness (`src/modules/
 
 ## What has not been tried yet
 
-Everything above is covered by about 1,600 automated tests, and the camera pipeline has cast spells end to end in Chrome from a fake-camera clip of a bright dot. The time budgets of Section 13 hold in `npm run test:perf`; in headless Chrome on the development machine, without a real GPU, casting now and then runs one 50 to 130 ms task around the first casts of a session, so measure on the reference laptop before a release (`npm run preview`, then `npm run perf:casting`). Not yet tried with real hardware:
+Everything above is covered by about 1,700 automated tests, and the camera pipeline has cast spells end to end in Chrome from a fake-camera clip of a bright dot. The time budgets of Section 13 hold in `npm run test:perf`; in headless Chrome on the development machine, without a real GPU, casting now and then runs one 50 to 130 ms task around the first casts of a session, so measure on the reference laptop before a release (`npm run preview`, then `npm run perf:casting`). Not yet tried with real hardware:
 
 - a real wand and webcam (Appendix A is the first step);
 - camera exposure control (Chrome's fake camera offers none);
 - voice with a real microphone and a downloaded language pack;
-- the hand tracker's grip mode, which needs tuning against real casts;
+- the wand route, which was measured on clips of a real hand photo holding a drawn wand, not yet with a real wand and webcam: a wand the colour of what is behind it, a shiny or carved shaft, other grips and other lighting are all untried;
+- the hand tracker's grip mode ("Past your knuckles"), now the fallback for a wand the camera cannot make out, which still needs tuning against real casts;
 - the hand route's rules for gaps, collapsed fingers and small hands, which were measured on simulated hand noise and on clips of a hand photo, not yet on a live hand;
 - the hand tracker reading the camera track directly, which was measured as a prototype with Chrome's fake camera, and its move to the CPU when the GPU delegate is slow, neither yet with a real webcam;
 - the sounds, which were measured for level but not judged by ear;

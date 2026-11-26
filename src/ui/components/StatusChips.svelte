@@ -4,7 +4,7 @@
   // (Section 7.9: "Runs without saving and says so"). Each chip has a shape as well as a color.
   import type { AppState } from '../app-state.svelte';
   import { ask } from '../../kernel';
-  import { cameraChip, cameraWanted } from './shell/routes';
+  import { cameraChip, cameraWanted, wandFound } from './shell/routes';
 
   let { app }: { app: AppState } = $props();
 
@@ -19,7 +19,9 @@
     if (!t) return null;
     if (t.tracker === 'tracker.pointer') return { state: 'on', text: 'mouse or touch' };
     if (t.tracker === 'tracker.replay') return { state: 'on', text: 'replaying' };
-    const what = t.tracker === 'tracker.hand' ? 'hand' : 'wand';
+    // The hand tracker in wand mode follows the wand.
+    const wandMode = t.tracker === 'tracker.hand' && app.settings['hand.mode'] === 'wand';
+    const what = t.tracker === 'tracker.hand' && !wandMode ? 'hand' : 'wand';
     if (t.state === 'loading' && t.tracker === 'tracker.hand') {
       const p = typeof t.progress === 'number' ? Math.round(Math.max(0, Math.min(1, t.progress)) * 100) : null;
       return { state: 'warn', text: p !== null && p < 90 ? `hand model ${p}%` : 'hand model starting' };
@@ -34,8 +36,13 @@
     if (t.state === 'error') return { state: 'error', text: `${what} tracker stopped` };
     // Found or not, a hand that small is followed badly: the mirror's note says what to do.
     if (t.hint === 'hand-too-small') return { state: 'warn', text: 'hand looks small' };
+    if (t.hint === 'wand-not-seen') return { state: 'warn', text: 'wand not seen' };
+    // In wand mode the hand comes first; the wand is found once the camera has seen it in the hand.
+    if (t.state === 'tracking' && wandMode && !wandFound(t)) return { state: 'warn', text: 'hand found' };
     if (t.state === 'tracking') return { state: 'on', text: `${what} found` };
-    if (t.hint === 'tip-not-found' || t.hint === 'hand-not-found') return { state: 'warn', text: `${what} not found` };
+    // Only the hand tracker says 'hand-not-found': in wand mode too it is the hand that is missing.
+    if (t.hint === 'hand-not-found') return { state: 'warn', text: 'hand not found' };
+    if (t.hint === 'tip-not-found') return { state: 'warn', text: `${what} not found` };
     if (t.hint === 'too-many-lights') return { state: 'warn', text: 'too many bright lights' };
     return { state: 'off', text: `looking for ${what}` };
   });

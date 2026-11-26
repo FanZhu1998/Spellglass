@@ -69,6 +69,14 @@
       { d: 'M17.5 3v3.4M17.5 9.6V13M12.8 8h3.4M18.8 8h3.4M14.2 4.7l1.3 1.3M19.5 10l1.3 1.3M19.5 6l1.3-1.3' },
       { cx: 17.5, cy: 8, r: 1.1, fill: true },
     ],
+    // A fist holding a wand, its tip lit (the wand in the hand that holds it).
+    wandHand: [
+      { d: 'M10.4 11.4 18.6 3.2' },
+      { cx: 19.5, cy: 2.6, r: 1, fill: true },
+      { d: 'M5.5 12.6c.3-1.4 1.6-2.2 3-1.9l3.7.9c1.4.3 2.2 1.7 1.9 3.1l-.7 2.8c-.5 2-2.5 3.2-4.5 2.7l-1.1-.3c-1.8-.5-2.9-2.3-2.5-4.1Z' },
+      { d: 'M6.5 14.8l5.7 1.4M6.1 17.2l4.8 1.2' },
+      { d: 'M7.2 20.2 4.4 23' },
+    ],
     // A hand with the index finger raised (route B).
     hand: [
       { d: 'M9.5 13V4.8a1.5 1.5 0 0 1 3 0V11' },

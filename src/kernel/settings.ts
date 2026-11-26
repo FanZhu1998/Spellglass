@@ -41,9 +41,17 @@ export function localStoragePersistence(key = 'spellglass.settings'): SettingsPe
 }
 
 /** Forward migrations of the settings shape, shared by stored settings and imported data exports
- *  (Section 9.4): SETTINGS_MIGRATIONS[v] turns settings of version v into version v + 1. Empty while
- *  SETTINGS_VERSION is 1; a version 2 adds one step here. */
-export const SETTINGS_MIGRATIONS: Readonly<Record<number, (values: Record<string, unknown>) => Record<string, unknown>>> = {};
+ *  (Section 9.4): SETTINGS_MIGRATIONS[v] turns settings of version v into version v + 1. */
+export const SETTINGS_MIGRATIONS: Readonly<Record<number, (values: Record<string, unknown>) => Record<string, unknown>>> = {
+  // 1 to 2: "The tip of my wand" became the hand tracker's wand mode, which finds the wand itself in the
+  // hand that holds it, in an ordinary room (contracts 1.3). Under 1 it was the glint of the tip alone (the
+  // bright tip, visible profile), which needs a light beside the lens and a dim room. A player who chose
+  // it moves to the new one; the glint stays a route of its own, and an infrared camera stays as it is.
+  1: (values) =>
+    values['tracker.active'] === 'tracker.bright-tip' && values['brightTip.profile'] !== 'infrared'
+      ? { ...values, 'tracker.active': 'tracker.hand', 'hand.mode': 'wand' }
+      : values,
+};
 
 /** Settings of an older version, migrated to SETTINGS_VERSION. */
 export function migrateSettings(values: Record<string, unknown>, fromVersion: number): Record<string, unknown> {

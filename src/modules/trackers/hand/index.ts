@@ -1,5 +1,10 @@
 // Hand tracker (tracker.hand): MediaPipe's Hand Landmarker follows a hand or a fingertip, and the wand is
-// a prop (Section 4 route B, the no-hardware fallback that always ships; Section 7.3).
+// a prop (Section 4 route B, the no-hardware fallback that always ships; Section 7.3). In wand mode
+// (setting 'hand.mode' 'wand') it follows the wand held in that hand instead: the worker reads the pixels
+// around the hand after the landmarks and finds the shaft leaving the fist (wand.ts), and the tip is kept
+// in the hand's own frame from frame to frame (tracking.ts WandTip), so it is carried through frames
+// where a fast stroke smears the shaft. Each frame sent in wand mode carries the tip's learned place in
+// the hand, which the worker searches around first.
 //
 // Threads (Section 5): the model runs in its own module worker (worker.ts). Verified with
 // @mediapipe/tasks-vision 1.2.3 and Vite 8, in the dev server and in a production build, in Chrome:
@@ -64,15 +69,16 @@ import {
 } from '../../../kernel';
 import type { HandMode } from './geometry';
 import type { Delegate, FrameImage, FromWorker, ToWorker } from './protocol';
-import { HandTipState, SEGMENTATION, type TrackingSettings } from './tracking';
+import { HandTipState, SEGMENTATION, type FrameOutcome, type TrackingSettings } from './tracking';
 
 export const MANIFEST: ModuleManifest = {
   id: 'tracker.hand',
   kind: 'tracker',
-  title: 'Hand or finger',
-  version: '1.0.0',
-  // 1.2: tracker.status carries `segmentation` and may say 'hand-too-small'.
-  contract: '^1.2',
+  title: 'Hand, finger or wand in hand',
+  version: '1.1.0',
+  // 1.2: tracker.status carries `segmentation` and may say 'hand-too-small'. 1.3: wand mode, with
+  // 'wand-not-seen', TrackerStatus.wand and TrackerDebugFrame.wand.
+  contract: '^1.3',
   provides: ['tip.source'],
   // camera.frames@1 is the capture module's capability: without capture there is nothing to track. The
   // worker path needs module workers with OffscreenCanvas (WebGL for MediaPipe's image input).
@@ -234,7 +240,7 @@ export function buildHandTracker(opts: { modelUrl: string; wasmBaseUrl: string }
     const mode = setting(kernel, 'hand.mode');
     const reach = setting(kernel, 'hand.gripReach');
     return {
-      mode: (mode === 'grip' ? 'grip' : 'finger') as HandMode,
+      mode: (mode === 'grip' || mode === 'wand' ? mode : 'finger') as HandMode,
       reach: typeof reach === 'number' && Number.isFinite(reach) ? reach : 0.9,
       flipX: setting(kernel, 'capture.flipX') !== false,
     };
@@ -582,6 +588,8 @@ export function buildHandTracker(opts: { modelUrl: string; wasmBaseUrl: string }
       type: 'frame', run, seq, generation: m.generation, t: m.t, frame: m.frame, width: m.width, height: m.height,
       image, preview: wantPreview, flipX: setting(kernel, 'capture.flipX') !== false,
     };
+    // Wand mode: find the wand too, around the tip's learned place in the hand.
+    if (setting(kernel, 'hand.mode') === 'wand') msg.wand = { prior: tip.wandPrior() };
     try {
       worker.postMessage(msg, [image]);
     } catch (err) {
@@ -658,13 +666,13 @@ export function buildHandTracker(opts: { modelUrl: string; wasmBaseUrl: string }
       emit(kernel, ID, 'tip.found', out.found, out.found.t);
     }
     if (out.sample) emit(kernel, ID, 'tip.sample', out.sample as TipSample, out.sample.t);
-    if (preview) publishDebug(msg, out.landmarks);
+    if (preview) publishDebug(msg, out.landmarks, out.wand);
     else msg.preview?.close();
   }
 
   /** One 'tracker.debug' per frame that asked for it (about 10 a second), with the worker's mirrored
    *  preview when it could make one (image null otherwise) and the landmarks in caster space. */
-  function publishDebug(msg: Extract<FromWorker, { type: 'result' }>, landmarks: [number, number][] | undefined): void {
+  function publishDebug(msg: Extract<FromWorker, { type: 'result' }>, landmarks: [number, number][] | undefined, wand: FrameOutcome['wand']): void {
     const image = msg.preview ?? null;
     if (setting(kernel, 'tracker.debug') !== true) {
       image?.close();
@@ -680,6 +688,7 @@ export function buildHandTracker(opts: { modelUrl: string; wasmBaseUrl: string }
       height: image?.height ?? msg.height,
       blobs: [],
       ...(landmarks ? { landmarks } : {}),
+      ...(wand ? { wand } : {}),
     }, msg.t);
     // The previous view stays valid until this one is out (contracts/events.ts TrackerDebugFrame).
     if (image) previous?.close();
@@ -727,11 +736,16 @@ export function buildHandTracker(opts: { modelUrl: string; wasmBaseUrl: string }
       progress: state === 'loading' ? Math.round(progress * 100) / 100 : undefined,
       message,
       // Section 7.9, contracts/events.ts: 'hand-not-found' 3 s after the last confident sample, cleared
-      // when found; 'hand-too-small' while the hands of the last second are small; both cleared on stop.
+      // when found; 'hand-too-small' while the hands of the last second are small; in wand mode
+      // 'wand-not-seen' while the hand is held and no wand has been found for 3 s; all cleared on stop.
       hint: state === 'stopped' || state === 'error' || phase !== 'ready' || !camera ? null : tip.hint(k),
       // What these samples need from the segmenter (tracking.ts), a plain copy of the frozen constant.
       segmentation: { ...SEGMENTATION },
     };
+    // Wand mode: how often the wand is seen, and whether its place in the hand is learned. The mode now,
+    // not the mode of the last frame with a hand: the readout goes as soon as the mode does.
+    const wand = state === 'stopped' || state === 'error' || setting(kernel, 'hand.mode') !== 'wand' ? null : tip.wandStatus(k);
+    if (wand) status.wand = wand;
     emit(kernel, ID, 'tracker.status', status);
   }
 

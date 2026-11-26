@@ -17,7 +17,7 @@
   import TrackingTest from '../components/tools/TrackingTest.svelte';
   import { errorText } from '../components/tools/format';
   import { isSeated } from '../components/tools/play-area';
-  import { TEXT } from '../components/shell/routes';
+  import { TEXT, handModeFor, trackerLine } from '../components/shell/routes';
 
   let { app }: { app: AppState } = $props();
 
@@ -96,13 +96,17 @@
   // ------------------------------------------------------------------ the route
   const active = $derived(app.settings['tracker.active']);
   const route = $derived.by((): Route | null => {
-    if (active === 'tracker.bright-tip') return app.settings['brightTip.profile'] === 'infrared' ? 'infrared' : 'wand';
-    if (active === 'tracker.hand') return 'hand';
+    if (active === 'tracker.bright-tip') return app.settings['brightTip.profile'] === 'infrared' ? 'infrared' : 'glint';
+    if (active === 'tracker.hand') return app.settings['hand.mode'] === 'wand' ? 'wand' : 'hand';
     if (active === 'tracker.pointer') return 'pointer';
     return null;
   });
-  const usesCamera = $derived(route === 'wand' || route === 'infrared' || route === 'hand');
-  const brightTip = $derived(route === 'wand' || route === 'infrared');
+  const usesCamera = $derived(route !== null && route !== 'pointer');
+  const brightTip = $derived(route === 'glint' || route === 'infrared');
+  /** Wand mode's readout: how often the wand is seen, and whether its place in the hand is learned. */
+  const wandSeen = $derived(route === 'wand' && app.tracker?.tracker === 'tracker.hand' ? app.tracker.wand ?? null : null);
+  /** The wand route's status sentence, said to screen readers when it changes. */
+  const wandLine = $derived(route === 'wand' ? (trackerLine(app.tracker, 'wand')?.text ?? '') : '');
 
   const disabledRoutes = $derived.by(() => {
     const out: Partial<Record<Route, string>> = {};
@@ -148,13 +152,16 @@
     if (!def) return;
     switching = true;
     routeError = null;
-    const profile = r === 'infrared' ? 'infrared' : r === 'wand' ? 'visible' : null;
+    const profile = r === 'infrared' ? 'infrared' : r === 'glint' ? 'visible' : null;
     // Before anything below opens the camera, so the camera.ready that follows is not missed.
     unsavedRoute = profile;
     try {
       // Choosing a camera route here is the moment the camera is needed (Section 11.2); the sentence
       // beside the choice says why.
       if (def.tracker !== 'tracker.pointer' && app.settings['capture.consent'] !== true) await app.set('capture.consent', true);
+      // The hand tracker's mode goes with the route, as on the Threshold (handModeFor).
+      const mode = handModeFor(r, app.settings['hand.mode']);
+      if (mode) await app.set('hand.mode', mode);
       if (profile) {
         if (app.settings['brightTip.profile'] !== profile) await app.set('brightTip.profile', profile);
         const ir = devices.find((d) => d.infrared);
@@ -322,14 +329,30 @@
             <span class="label" id="hand-mode-label">The tip is</span>
             <div class="segmented" role="radiogroup" aria-labelledby="hand-mode-label">
               <button type="button" role="radio" aria-checked={app.settings['hand.mode'] === 'finger'} onclick={() => app.set('hand.mode', 'finger')}>Your fingertip</button>
-              <button type="button" role="radio" aria-checked={app.settings['hand.mode'] === 'grip'} onclick={() => app.set('hand.mode', 'grip')}>The wand in your hand</button>
+              <button type="button" role="radio" aria-checked={app.settings['hand.mode'] === 'grip'} onclick={() => app.set('hand.mode', 'grip')}>Past your knuckles</button>
             </div>
           </div>
           <p class="help">
             {app.settings['hand.mode'] === 'grip'
-              ? 'A point projected forward from the knuckles of the hand that holds the wand.'
+              ? 'A point projected forward from the knuckles, for a wand the camera cannot make out. Wand tip, above, finds the wand itself.'
               : 'Your index fingertip is the wand. Best for visitors without one.'}
           </p>
+        {:else if route === 'wand'}
+          <p class="help">
+            The camera finds the hand that holds the wand, then the wand as a thin bar leaving the fist. Hold it up across the
+            camera rather than pointed at it, against a plain wall if you can. In a fast stroke the shaft blurs; the tip then
+            follows the hand, where the wand was last seen in it. A light beside the lens sharpens the tip.
+          </p>
+          {#if wandSeen}
+            <!-- The figures change twice a second and are not read out; the sentence below is, when it changes. -->
+            <p class="help readout">
+              Seen in {Math.round(wandSeen.seen * 100)}% of the last second's frames with your hand in view; its place
+              in your hand {wandSeen.learned ? 'is learned' : 'is not learned yet'}.
+            </p>
+          {/if}
+          <!-- What the wand route's status line says (found, not seen, the hand not found), for screen readers:
+               the mirror's own line is not on screen while this drawer is open. -->
+          <p class="visually-hidden" role="status">{wandLine}</p>
         {/if}
       </ToolSection>
 

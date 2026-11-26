@@ -29,6 +29,8 @@
   const trackerId = $derived(app.tracker?.tracker ?? app.settings['tracker.active']);
   const isBrightTip = $derived(trackerId === 'tracker.bright-tip');
   const isHand = $derived(trackerId === 'tracker.hand');
+  /** The hand tracker in wand mode: it finds the wand in the hand, and draws it. */
+  const isWand = $derived(isHand && app.settings['hand.mode'] === 'wand');
   const isCamera = $derived(isBrightTip || isHand);
 
   let glass = $state<HTMLDivElement>();
@@ -51,7 +53,7 @@
   // ------------------------------------------------------------------ plain drawing state
   let copy: HTMLCanvasElement | null = null;
   let haveImage = false;
-  let latest: { tracker: string; blobs: TrackerDebugFrame['blobs']; landmarks?: [number, number][] } | null = null;
+  let latest: { tracker: string; blobs: TrackerDebugFrame['blobs']; landmarks?: [number, number][]; wand?: TrackerDebugFrame['wand'] } | null = null;
   let lastFrameAt = 0;
   let lastReadoutAt = 0;
   let trail: { x: number; y: number; t: number }[] = [];
@@ -84,7 +86,7 @@
         if (!imageAspect || Math.abs(imageAspect - a) > 0.01) imageAspect = a;
       }
     }
-    latest = { tracker: d.tracker, blobs: Array.isArray(d.blobs) ? d.blobs : [], landmarks: d.landmarks };
+    latest = { tracker: d.tracker, blobs: Array.isArray(d.blobs) ? d.blobs : [], landmarks: d.landmarks, wand: d.wand };
     lastFrameAt = performance.now();
     paint();
 
@@ -204,7 +206,8 @@
       }
       ctx.globalAlpha = 1;
       for (let i = 0; i < lm.length; i++) {
-        const tipJoint = i === 8;
+        // The index fingertip is the tip in finger mode; in wand mode the wand's own tip is drawn below.
+        const tipJoint = i === 8 && !f.wand;
         ctx.fillStyle = tipJoint ? palette.candle : palette.vellum;
         ctx.beginPath();
         ctx.arc(lm[i][0] * W, lm[i][1] * H, (tipJoint ? 4.5 : 2.8) * dpr, 0, Math.PI * 2);
@@ -213,7 +216,26 @@
       ctx.restore();
     }
 
-    // Where the tracker puts the tip now (for the hand: the fingertip or the grip projection).
+    // Wand mode: the shaft found in this frame, from where it leaves the hand to its tip.
+    const wand = f.wand;
+    if (wand?.base) {
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = palette.night;
+      ctx.globalAlpha = 0.7;
+      ctx.lineWidth = 5 * dpr;
+      ctx.beginPath();
+      ctx.moveTo(wand.base[0] * W, wand.base[1] * H);
+      ctx.lineTo(wand.tip[0] * W, wand.tip[1] * H);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = palette.candle;
+      ctx.lineWidth = 2.4 * dpr;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Where the tracker puts the tip now (for the hand: the fingertip, the grip projection or the wand's tip).
     const last = trail[trail.length - 1];
     if (last && now - last.t < 300) {
       ctx.save();
@@ -420,7 +442,10 @@
   const contrast = $derived(isBrightTip ? status?.contrast : undefined);
   const contrastWord = $derived(contrast === undefined ? 'No tip in view' : contrast >= 3 ? 'Clear' : 'Too faint');
   const meterPos = $derived(contrast === undefined ? 0 : Math.min(1, Math.max(0, (contrast - 1) / 5)));
-  const stepOver = $derived(typeof status?.stepMs === 'number' && status.stepMs > 4);
+  /** Time a frame may take: the bright tip's budget (Section 13, 4 ms), or for the hand model (and the wand
+   *  in the hand) one frame of a 30 fps camera, past which it drops frames (it takes 17 to 35 ms). */
+  const stepBudget = $derived(isHand ? 33 : 4);
+  const stepOver = $derived(typeof status?.stepMs === 'number' && status.stepMs > stepBudget);
 </script>
 
 <div class="live">
@@ -475,6 +500,7 @@
         <span class="key"><span class="ring" aria-hidden="true"></span>other bright spots{candidates ? ` (${candidates})` : ''}</span>
       {:else}
         <span class="key"><span class="bone" aria-hidden="true"></span>hand landmarks</span>
+        {#if isWand}<span class="key"><span class="shaft" aria-hidden="true"></span>the wand it found</span>{/if}
         <span class="key"><span class="dot" aria-hidden="true"></span>the tip it follows</span>
       {/if}
     </p>
@@ -519,7 +545,8 @@
     </dl>
     <p class="help">
       {#if isBrightTip}Contrast is the tip’s brightness against the brightest background; aim for 3×.{/if}
-      Lock is the share of frames with a confident tip. Per frame is the tracker’s time{stepOver ? ', now over' : ', best under'} 4 ms.
+      Lock is the share of frames with a confident tip.
+      {#if isHand}Per frame is the hand model’s time{stepOver ? ', now over' : ', best under'} 33 ms, one frame of a 30 fps camera.{:else}Per frame is the tracker’s time{stepOver ? ', now over' : ', best under'} 4 ms.{/if}
     </p>
 
     <div class="area-controls">
@@ -704,6 +731,15 @@
     height: 2px;
     background: var(--vellum);
     border-radius: 2px;
+  }
+
+  .shaft {
+    width: 20px;
+    height: 3px;
+    background: var(--candle);
+    border-radius: 2px;
+    box-shadow: 0 0 0 1px rgb(15 20 36 / 0.7);
+    transform: rotate(-35deg);
   }
 
   .dot {

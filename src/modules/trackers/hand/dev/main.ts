@@ -3,6 +3,7 @@
 //   npx vite --port 5184 --strictPort, then open /src/modules/trackers/hand/dev/index.html
 //   ?image=/path/to/hand.jpg   use a still image as the camera
 //   ?mode=grip                 grip mode instead of finger mode
+//   ?mode=wand                 wand mode: the wand in the hand, found in the frame (wand.ts)
 //   ?delegate=cpu              skip the GPU delegate (to compare timings with the fallback)
 //   ?source=video              read frames from the video ('camera.frame') only, as where Chromium's
 //                              MediaStreamTrackProcessor is missing (to compare with the fast path)
@@ -28,7 +29,7 @@ const kernel = createKernel({
   persistence: memoryPersistence({
     'tracker.active': 'tracker.hand',
     'capture.consent': true,
-    'hand.mode': params.get('mode') === 'grip' ? 'grip' : 'finger',
+    'hand.mode': params.get('mode') === 'grip' ? 'grip' : params.get('mode') === 'wand' ? 'wand' : 'finger',
   }),
 });
 

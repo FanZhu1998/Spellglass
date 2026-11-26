@@ -271,7 +271,7 @@ describe('export and import', () => {
   it('exports every store but sessions, with the player\'s own settings only', async () => {
     const { kernel } = await filled();
     const doc = await ask(kernel, 'storage.export');
-    expect(doc).toMatchObject({ schema: 'spellglass-data/1', dataVersion: 1, settingsVersion: 1, settings: { 'audio.volume': 0.4, 'access.captions': true } });
+    expect(doc).toMatchObject({ schema: 'spellglass-data/1', dataVersion: 1, settingsVersion: 2, settings: { 'audio.volume': 0.4, 'access.captions': true } });
     expect(Object.keys(doc.stores).sort()).toEqual(STORE_NAMES.filter((s) => s !== 'sessions').sort());
     expect(doc.stores.progress).toEqual([{ key: 'lumos', value: expect.objectContaining({ casts: 3 }) }]);
     expect(Object.keys(doc.settings)).not.toContain('engine.mode');

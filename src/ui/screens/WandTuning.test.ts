@@ -192,10 +192,34 @@ describe('Wand tuning: the route and the reflection', () => {
 
   it('brings the reflection back when a camera route follows a mouse first run', async () => {
     const { kernel, target } = await setup({ 'capture.consent': false, 'capture.mirror': false, 'tracker.active': 'tracker.pointer' });
-    pick(target, 'wand');
+    pick(target, 'glint');
     await vi.waitFor(() => expect(tracker(kernel)).toBe('tracker.bright-tip'));
     expect(mirror(kernel)).toBe(true);
     expect(kernel.settings.get('capture.consent', null)).toBe(true);
+  });
+});
+
+describe("Wand tuning: the hand tracker's mode goes with the route", () => {
+  it('keeps the point past the knuckles through other routes, and turns wand mode back to the fingertip', async () => {
+    const { kernel, target } = await setup({ 'capture.consent': true, 'tracker.active': 'tracker.hand', 'hand.mode': 'grip' });
+    const mode = () => kernel.settings.get('hand.mode', '');
+    const active = () => kernel.settings.get('tracker.active', '');
+    // The routes are disabled while one is being switched to.
+    const ready = (r: string) => vi.waitFor(() => expect(target.querySelector<HTMLInputElement>(`input[name="tracker-route"][value="${r}"]`)!.disabled).toBe(false));
+    await ready('glint');
+    pick(target, 'glint');
+    await vi.waitFor(() => expect(active()).toBe('tracker.bright-tip'));
+    await ready('hand');
+    pick(target, 'hand');
+    await vi.waitFor(() => expect(active()).toBe('tracker.hand'));
+    expect(mode()).toBe('grip');
+    await ready('wand');
+    pick(target, 'wand');
+    await vi.waitFor(() => expect(mode()).toBe('wand'));
+    expect(active()).toBe('tracker.hand');
+    await ready('hand');
+    pick(target, 'hand');
+    await vi.waitFor(() => expect(mode()).toBe('finger'));
   });
 });
 
@@ -230,6 +254,6 @@ describe('Wand tuning: the keyboard’s place', () => {
     use.focus();
     use.click();
     await vi.waitFor(() => expect(kernel.settings.get('capture.consent', null)).toBe(true));
-    await vi.waitFor(() => expect(document.activeElement).toBe(target.querySelector('input[name="tracker-route"][value="wand"]')));
+    await vi.waitFor(() => expect(document.activeElement).toBe(target.querySelector('input[name="tracker-route"][value="glint"]')));
   });
 });

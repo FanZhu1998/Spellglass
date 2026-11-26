@@ -16,12 +16,13 @@
 // whole milliseconds and nudged past the previous one when two frames share a millisecond. A frame is a
 // VideoFrame from the camera track or an ImageBitmap of the video (protocol.ts FrameImage); MediaPipe
 // 1.2.3 takes both (a VideoFrame sized by its displayWidth, measured in the latency study), and whole
-// 1080p VideoFrames ran on both delegates. Each one is closed as soon as the model is done with it, on
-// every path: an open VideoFrame holds one of the camera's few buffers, and the camera stalls when they
-// run out.
+// 1080p VideoFrames ran on both delegates. Each one is closed as soon as the model is done with it (in
+// wand mode, once the pixels around the hand have been read for the wand finder, wand.ts), on every path:
+// an open VideoFrame holds one of the camera's few buffers, and the camera stalls when they run out.
 
 import { AssetError, downloadAll, type AssetRequest } from './assets';
-import type { Delegate, FrameImage, FromWorker, HandWire, ToWorker } from './protocol';
+import type { Delegate, FrameImage, FromWorker, HandWire, ToWorker, WandWire } from './protocol';
+import { gripFrame, WandFinder, wandRegion, type LumaPlane, type Rect, type WandFound } from './wand';
 
 /** What the core needs from a HandLandmarker (a subset of @mediapipe/tasks-vision's). */
 export interface LandmarkerLike {
@@ -46,6 +47,9 @@ export interface WorkerCoreDeps {
   preview?(image: FrameImage, flipX: boolean): ImageBitmap | null;
   /** A blank image for the warm-up detection, or null to skip it. */
   warmupImage?(): ImageBitmap | ImageData | null;
+  /** Wand mode: the brightness of a rectangle of the frame (luma.ts), or null when it cannot be read.
+   *  Absent: wand mode finds no wand (the tracker then guesses past the knuckles). */
+  readLuma?(image: FrameImage, rect: Rect): Promise<LumaPlane | null>;
   /** performance.now(), for stepMs only. */
   now(): number;
 }
@@ -58,6 +62,7 @@ export function createWorkerCore(deps: WorkerCoreDeps): WorkerCore {
   let landmarker: LandmarkerLike | null = null;
   let loading = false;
   let lastTs = -Infinity;
+  const finder = new WandFinder();
 
   async function load(msg: Extract<ToWorker, { type: 'load' }>): Promise<void> {
     if (loading || landmarker) return;
@@ -117,13 +122,15 @@ export function createWorkerCore(deps: WorkerCoreDeps): WorkerCore {
     }
   }
 
-  function frame(msg: Extract<ToWorker, { type: 'frame' }>): void {
+  async function frame(msg: Extract<ToWorker, { type: 'frame' }>): Promise<void> {
     // seq goes back with the answer, whichever it is: the tracker frees its one slot only for the frame
     // it is waiting for (protocol.ts).
     const { run, seq, generation, t, frame: n, width, height, image } = msg;
     let hand: HandWire | null = null;
     let stepMs = 0;
     let preview: ImageBitmap | null = null;
+    let wand: WandWire | null | undefined;
+    let wandMs: number | undefined;
     try {
       if (!landmarker) {
         deps.post({ type: 'error', run, seq, generation, message: 'The hand model is not loaded yet.' });
@@ -141,6 +148,20 @@ export function createWorkerCore(deps: WorkerCoreDeps): WorkerCore {
         deps.post({ type: 'error', run, seq, generation, message: text(err) });
         return;
       }
+      // Wand mode: the pixels around the hand, read before the frame is closed. A failure here costs the
+      // wand for this frame, never the hand.
+      if (msg.wand) {
+        wand = null;
+        if (hand && deps.readLuma) {
+          const began = deps.now();
+          try {
+            wand = await findWand(image, hand, msg.wand.prior);
+          } catch {
+            wand = null;
+          }
+          wandMs = Math.round((deps.now() - began) * 100) / 100;
+        }
+      }
       // The preview is only a view for the tuning screen: when it fails, the detection still counts.
       if (msg.preview && deps.preview) {
         try {
@@ -150,17 +171,34 @@ export function createWorkerCore(deps: WorkerCoreDeps): WorkerCore {
         }
       }
     } finally {
-      // Every path closes the frame: by now detectForVideo (synchronous) and the preview have read it, or
-      // it never reached them.
+      // Every path closes the frame: by now detectForVideo (synchronous), the wand's read and the preview
+      // have read it, or it never reached them.
       closeImage(image);
     }
     const out: FromWorker = { type: 'result', run, seq, generation, t, frame: n, width, height, hand, stepMs: Math.round(stepMs * 100) / 100 };
+    if (wand !== undefined) {
+      out.wand = wand;
+      if (wandMs !== undefined) out.wandMs = wandMs;
+    }
     if (preview) {
       out.preview = preview;
       deps.post(out, [preview]);
     } else {
       deps.post(out);
     }
+  }
+
+  /** Wand mode, one frame: the region around the hand (wand.ts wandRegion) at the frame's own size, its
+   *  brightness, the finder; the find in the landmarks' units (normalized, unmirrored). */
+  async function findWand(image: FrameImage, hand: HandWire, prior: { a: number; b: number } | null): Promise<WandWire | null> {
+    const size = frameSize(image);
+    if (!(size.width > 0 && size.height > 0)) return null;
+    const px: number[] = [];
+    for (let i = 0; i < 21; i++) px.push(hand.points[i * 3] * size.width, hand.points[i * 3 + 1] * size.height);
+    const rect = wandRegion(gripFrame(px, 2, 1, 1), size.width, size.height);
+    const plane = await deps.readLuma!(image, rect);
+    if (!plane) return null;
+    return wireOf(finder.find(plane, px, prior), size.width, size.height);
   }
 
   return {
@@ -170,7 +208,7 @@ export function createWorkerCore(deps: WorkerCoreDeps): WorkerCore {
           await load(msg);
           return;
         case 'frame':
-          frame(msg);
+          await frame(msg);
           return;
         case 'close':
           try {
@@ -199,6 +237,23 @@ export function firstHand(result: ReturnType<LandmarkerLike['detectForVideo']>):
   const presence = lms[8]?.presence;
   if (typeof presence === 'number' && presence > 0) hand.tipPresence = presence;
   return hand;
+}
+
+/** A find in frame pixels to the wire's units (normalized to the frame, like the landmarks). */
+export function wireOf(f: WandFound | null, width: number, height: number): WandWire | null {
+  if (!f) return null;
+  const nx = (x: number) => r5(x / width), ny = (y: number) => r5(y / height);
+  const wire: WandWire = {
+    tip: [nx(f.tip.x), ny(f.tip.y)],
+    base: [nx(f.base.x), ny(f.base.y)],
+    quality: f.quality,
+    contrast: f.contrast,
+    length: f.length,
+    cut: f.cut,
+    search: f.search,
+  };
+  if (f.glint) wire.glint = [nx(f.glint.x), ny(f.glint.y)];
+  return wire;
 }
 
 /** The size a frame shows at: a VideoFrame's display size (what MediaPipe sizes it by), an ImageBitmap's

@@ -7,6 +7,7 @@
 
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 import { restrictNetwork } from './guard';
+import { createLumaReader } from './luma';
 import type { ToWorker } from './protocol';
 import { createWorkerCore, frameSize, type LandmarkerLike } from './worker-core';
 
@@ -75,6 +76,11 @@ const core = createWorkerCore({
   // path feeds (640 x 360). After it, the fast path's first camera-sized VideoFrames took 20 to 60 ms on
   // the GPU delegate in the latency study, against 16 ms once running: no second long compile.
   warmupImage: () => (typeof ImageData === 'function' ? new ImageData(640, 360) : null),
+  // Wand mode: the brightness around the hand, from the frame itself (luma.ts).
+  readLuma: (() => {
+    const reader = createLumaReader();
+    return (image, rect) => reader.read(image, rect);
+  })(),
   now: () => performance.now(),
 });
 

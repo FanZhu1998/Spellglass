@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { FrameImage, FromWorker, ToWorker } from './protocol';
-import { createWorkerCore, firstHand, frameSize, type LandmarkerLike, type WorkerCoreDeps } from './worker-core';
+import type { Rect } from './wand';
+import { renderScene } from './wand-scene';
+import { createWorkerCore, firstHand, frameSize, wireOf, type LandmarkerLike, type WorkerCoreDeps } from './worker-core';
 
 const BASE = 'https://app.test/models/wasm';
 const FILES = { wasmLoaderPath: `${BASE}/vision_wasm_module_internal.js`, wasmBinaryPath: `${BASE}/vision_wasm_module_internal.wasm` };
@@ -275,5 +277,83 @@ describe('firstHand', () => {
     expect(firstHand({ landmarks: [lms], handedness: [[{ score: 0.9, categoryName: 'Right' }]] })!.tipPresence).toBe(0.77);
     expect(firstHand({ landmarks: [], handedness: [] })).toBeNull();
     expect(firstHand({ landmarks: [landmarks().slice(0, 5)], handedness: [] })).toBeNull();
+  });
+});
+
+describe('hand worker core: wand mode', () => {
+  /** A fist holding a wand on a 1080p frame (wand-scene.ts), as the model and the pixels see it. */
+  const scene = renderScene({
+    width: 1920, height: 1080, hand: { x: 960, y: 800, palm: 110, angle: -Math.PI / 2 - 0.2 },
+    wand: { angle: -2.0, length: 2.6 }, background: 'room',
+  });
+  const sceneLandmarks = Array.from({ length: 21 }, (_, i) => ({ x: scene.normalized[i * 3], y: scene.normalized[i * 3 + 1], z: 0 }));
+  function plane(rect: Rect) {
+    const data = new Uint8Array(rect.width * rect.height);
+    for (let y = 0; y < rect.height; y++) data.set(scene.data.subarray((rect.y + y) * 1920 + rect.x, (rect.y + y) * 1920 + rect.x + rect.width), y * rect.width);
+    return { data, width: rect.width, height: rect.height, stride: rect.width, x0: rect.x, y0: rect.y };
+  }
+
+  async function ready(read: WorkerCoreDeps['readLuma']) {
+    const s = setup();
+    s.deps.readLuma = read;
+    const core = createWorkerCore(s.deps);
+    await core.handle(load());
+    s.landmarker.detectForVideo = (img: FrameImage | ImageData) => {
+      s.detected.push({ image: img, open: true });
+      return s.scene.hand ? { landmarks: [sceneLandmarks], handedness: [[{ score: 0.93, categoryName: 'Left' }]] } : { landmarks: [], handedness: [] };
+    };
+    return { s, core };
+  }
+  const wandMsg = (image: FrameImage): ToWorker => ({ ...(frameMsg(100, image) as Extract<ToWorker, { type: 'frame' }>), wand: { prior: null } });
+  const result = (s: Setup) => s.posted.at(-1)!.msg as Extract<FromWorker, { type: 'result' }>;
+
+  it('reads the pixels around the hand before the frame is closed, and finds the wand', async () => {
+    const reads: { rect: Rect; open: boolean }[] = [];
+    const image = videoFrame();
+    const { s, core } = await ready(async (_img, rect) => {
+      reads.push({ rect, open: image.close.mock.calls.length === 0 });
+      return plane(rect);
+    });
+    await core.handle(wandMsg(image));
+    expect(reads).toHaveLength(1);
+    expect(reads[0].open).toBe(true);
+    expect(image.close).toHaveBeenCalledTimes(1);
+    const r = result(s);
+    expect(r.hand).not.toBeNull();
+    expect(r.wand).toBeTruthy();
+    // In the landmarks' units: normalized to the frame, unmirrored.
+    expect(Math.hypot((r.wand!.tip[0] - scene.tip!.x / 1920) * 1920, (r.wand!.tip[1] - scene.tip!.y / 1080) * 1080)).toBeLessThan(11);
+    expect(r.wand!.quality).toBeGreaterThan(0.5);
+    expect(typeof r.wandMs).toBe('number');
+  });
+
+  it('does nothing of the sort outside wand mode', async () => {
+    const read = vi.fn();
+    const { s, core } = await ready(read);
+    await core.handle(frameMsg(100, videoFrame()));
+    expect(read).not.toHaveBeenCalled();
+    expect('wand' in result(s)).toBe(false);
+  });
+
+  it('loses only the wand when the pixels cannot be read, and reads nothing without a hand', async () => {
+    const failing = await ready(async () => {
+      throw new Error('copyTo refused');
+    });
+    await failing.core.handle(wandMsg(videoFrame()));
+    expect(result(failing.s).hand).not.toBeNull();
+    expect(result(failing.s).wand).toBeNull();
+
+    const read = vi.fn(async (_img: FrameImage, rect: Rect) => plane(rect));
+    const empty = await ready(read);
+    empty.s.scene.hand = false;
+    await empty.core.handle(wandMsg(videoFrame()));
+    expect(read).not.toHaveBeenCalled();
+    expect(result(empty.s)).toMatchObject({ hand: null, wand: null });
+  });
+
+  it('turns a find into the wire', () => {
+    expect(wireOf(null, 100, 100)).toBeNull();
+    const w = wireOf({ tip: { x: 50, y: 25 }, base: { x: 10, y: 20 }, quality: 0.8, contrast: 40, length: 2, support: 0.9, cut: false, glint: { x: 51, y: 24 }, search: 'prior' }, 100, 50)!;
+    expect(w).toEqual({ tip: [0.5, 0.5], base: [0.1, 0.4], quality: 0.8, contrast: 40, length: 2, cut: false, search: 'prior', glint: [0.51, 0.48] });
   });
 });

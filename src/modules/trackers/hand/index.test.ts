@@ -339,7 +339,7 @@ describe('hand tracker', () => {
       expect(statuses[0]).toMatchObject({ tracker: 'tracker.hand', state: 'loading', progress: 0, message: 'Hand model loading', pen: false });
       // Every status says what the samples need from the segmenter (contracts 1.2).
       for (const s of statuses) expect(s.segmentation).toEqual({ lostMs: 500, minSamples: 5, pauseMs: 300 });
-      expect(MANIFEST.contract).toBe('^1.2');
+      expect(MANIFEST.contract).toBe('^1.3');
       // Downloads fill 90% of the bar; then the model is set up.
       expect(statuses.some((s) => s.state === 'loading' && s.progress === 0.9 && s.message === 'Hand model starting')).toBe(true);
       const loading = statuses.filter((s) => s.state === 'loading').map((s) => s.progress ?? 0);
@@ -394,6 +394,33 @@ describe('hand tracker', () => {
     for (let i = 0; i < 30; i++) await h.frame();
     vi.advanceTimersByTime(500);
     expect(h.statuses().at(-1)).toMatchObject({ state: 'tracking', hint: null });
+  });
+
+  it('in wand mode asks the worker for the wand, guesses past the knuckles until it is seen, and says so', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
+    h = await harness({}, { 'hand.mode': 'wand' });
+    await h.kernel.settings.set('tracker.debug', true);
+    h.scene.tip = [0.3, 0.4];
+    await h.frame();
+    // Every frame asks for the wand, with no place in the hand learned yet.
+    expect(h.frames().at(-1)!.wand).toEqual({ prior: null });
+    // This worker reads no pixels: no wand, so the tip is the grip projection.
+    const [s] = h.of<TipSample>('tip.sample');
+    expect(s.x).toBeCloseTo(0.5, 5);
+    expect(s.y).toBeLessThan(0.6);
+    expect(h.of<TrackerDebugFrame>('tracker.debug')[0].wand).toMatchObject({ source: 'grip', quality: 0 });
+    for (let i = 0; i < 35; i++) await h.frame(100);
+    vi.advanceTimersByTime(500);
+    expect(h.statuses().at(-1)).toMatchObject({ state: 'tracking', hint: 'wand-not-seen', wand: { seen: 0, learned: false } });
+    // Not in finger mode, at once: the hand has gone before the switch, so no frame with a hand comes to
+    // tell the tracking state the mode changed.
+    h.scene.tip = null;
+    for (let i = 0; i < 3; i++) await h.frame();
+    await h.kernel.settings.set('hand.mode', 'finger');
+    vi.advanceTimersByTime(500);
+    expect(h.statuses().at(-1)!.wand).toBeUndefined();
+    await h.frame();
+    expect(h.frames().at(-1)!.wand).toBeUndefined();
   });
 
   it('retries once on the CPU when the GPU delegate fails', async () => {

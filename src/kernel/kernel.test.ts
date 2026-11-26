@@ -110,6 +110,24 @@ describe('SettingsStore', () => {
     const store = new SettingsStore(memoryPersistence());
     expect(() => store.set('brightTip.k', 'four')).toThrow(TypeError);
   });
+
+  it('moves a version 1 "tip of my wand" (the glint alone) to the wand in the hand, and leaves the rest', () => {
+    const v1 = (values: Record<string, unknown>) => new SettingsStore({ load: () => ({ v: 1, values }), save: () => {} });
+    const glint = v1({ 'tracker.active': 'tracker.bright-tip', 'brightTip.profile': 'visible', 'brightTip.k': 5 });
+    expect(glint.get('tracker.active', '')).toBe('tracker.hand');
+    expect(glint.get('hand.mode', '')).toBe('wand');
+    expect(glint.get('brightTip.k', 0)).toBe(5);
+    // The default profile is the visible one.
+    expect(v1({ 'tracker.active': 'tracker.bright-tip' }).get('hand.mode', '')).toBe('wand');
+    // An infrared camera, the hand and the pointer stay as they were.
+    const ir = v1({ 'tracker.active': 'tracker.bright-tip', 'brightTip.profile': 'infrared' });
+    expect(ir.get('tracker.active', '')).toBe('tracker.bright-tip');
+    expect(v1({ 'tracker.active': 'tracker.hand', 'hand.mode': 'grip' }).get('hand.mode', '')).toBe('grip');
+    expect(v1({ 'tracker.active': 'tracker.pointer' }).get('tracker.active', '')).toBe('tracker.pointer');
+    // Settings saved by this version are not moved again.
+    const now = new SettingsStore({ load: () => ({ v: 2, values: { 'tracker.active': 'tracker.bright-tip' } }), save: () => {} });
+    expect(now.get('tracker.active', '')).toBe('tracker.bright-tip');
+  });
 });
 
 describe('Kernel lifecycle', () => {
@@ -209,19 +227,21 @@ describe('Kernel lifecycle', () => {
     expect(kernel.modules()[0]).toMatchObject({ state: 'unavailable' });
   });
 
-  it('runs modules written for 1.1 and 1.2 on this 1.2 kernel, and refuses one that needs 1.3', async () => {
-    expect(CONTRACT).toBe('1.2');
+  it('runs modules written for 1.1, 1.2 and 1.3 on this 1.3 kernel, and refuses one that needs 1.4', async () => {
+    expect(CONTRACT).toBe('1.3');
     const kernel = createKernel({ persistence: memoryPersistence(), features: [] });
     kernel.register(
       fakeModule({ id: 'x.one', kind: 'share', contract: '^1.1' }),
       fakeModule({ id: 'x.two', kind: 'storage', contract: '^1.2' }),
-      fakeModule({ id: 'x.three', kind: 'effect', contract: '^1.3' }),
+      fakeModule({ id: 'x.three', kind: 'effect', contract: '^1.4' }),
+      fakeModule({ id: 'x.four', kind: 'scene', contract: '^1.3' }),
     );
     await kernel.init();
     const state = Object.fromEntries(kernel.modules().map((m) => [m.manifest.id, m.state]));
     expect(state['x.one']).not.toBe('unavailable');
     expect(state['x.two']).not.toBe('unavailable');
-    expect(kernel.modules().find((m) => m.manifest.id === 'x.three')).toMatchObject({ state: 'unavailable', reason: 'speaks contract ^1.3; this kernel is 1.2' });
+    expect(state['x.four']).not.toBe('unavailable');
+    expect(kernel.modules().find((m) => m.manifest.id === 'x.three')).toMatchObject({ state: 'unavailable', reason: 'speaks contract ^1.4; this kernel is 1.3' });
   });
 
   it('routes requests, attributes them, and rejects when nobody handles a name', async () => {

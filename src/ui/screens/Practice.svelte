@@ -47,6 +47,7 @@
     if (t?.hint === 'tip-not-found') return 'Wand tip not found. Point the tip at the camera and switch on the light beside the lens.';
     if (t?.hint === 'hand-not-found') return 'Hand not found. Hold your hand up where the camera can see it.';
     if (t?.hint === 'hand-too-small') return 'Your hand looks small to the camera. Step closer, or zoom the camera in.';
+    if (t?.hint === 'wand-not-seen') return 'Hand found, but not the wand. Hold it up across the camera, not pointed at it.';
     const how = pen
       ? 'Press and draw the shape on the mirror, keeping pace with the moving dot.'
       : 'Hold the tip still until it turns gold, then trace the shape at the pace of the moving dot.';

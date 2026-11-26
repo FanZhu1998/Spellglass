@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, type CameraStatus, type SettingsMap, type TrackerStatus } from '../../../contracts';
-import { TEXT, cameraChip, cameraLine, cameraWanted, trackerLine } from './routes';
+import { ROUTES, TEXT, cameraChip, cameraLine, cameraWanted, currentRoute, handModeFor, handRoute, routeInfo, trackerLine, wandFound } from './routes';
 
 const settings = (s: Partial<SettingsMap>): SettingsMap => ({ ...DEFAULT_SETTINGS, ...s });
 const camera = (s: Partial<CameraStatus>): CameraStatus => ({ state: 'off', generation: 1, permission: 'unknown', ...s });
@@ -62,5 +62,61 @@ describe('the hand tracker line', () => {
     expect(trackerLine(hand({ state: 'searching', hint: 'hand-too-small' }), 'hand')).toEqual({ tone: 'warn', text: TEXT.handTooSmall });
     expect(trackerLine(hand({ state: 'searching', hint: 'hand-not-found' }), 'hand')).toEqual({ tone: 'warn', text: TEXT.handNotFound });
     expect(TEXT.handTooSmall).toMatch(/closer/);
+  });
+});
+
+describe('the routes', () => {
+  it('reads the route from the tracker and its mode or profile, and back', () => {
+    expect(currentRoute(settings({ 'tracker.active': 'tracker.hand', 'hand.mode': 'wand' }))).toBe('wand');
+    expect(currentRoute(settings({ 'tracker.active': 'tracker.hand', 'hand.mode': 'finger' }))).toBe('hand');
+    expect(currentRoute(settings({ 'tracker.active': 'tracker.hand', 'hand.mode': 'grip' }))).toBe('hand');
+    expect(currentRoute(settings({ 'tracker.active': 'tracker.bright-tip', 'brightTip.profile': 'visible' }))).toBe('glint');
+    expect(currentRoute(settings({ 'tracker.active': 'tracker.bright-tip', 'brightTip.profile': 'infrared' }))).toBe('infrared');
+    expect(currentRoute(settings({ 'tracker.active': 'tracker.pointer' }))).toBe('pointer');
+    // Each route's settings describe it again.
+    for (const r of ROUTES) {
+      const mode = handModeFor(r.id, 'finger');
+      const s = settings({ 'tracker.active': r.tracker, ...(r.settings ?? {}), ...(mode ? { 'hand.mode': mode } : {}) });
+      expect(currentRoute(s)).toBe(r.id);
+      expect(routeInfo(r.id)).toBe(r);
+    }
+    expect(handRoute('wand')).toBe(true);
+    expect(handRoute('glint')).toBe(false);
+  });
+
+  it('puts the wand in the hand first, the way that needs nothing but the wand', () => {
+    expect(ROUTES[0]).toMatchObject({ id: 'wand', title: 'The tip of my wand', tracker: 'tracker.hand' });
+  });
+
+  it("sets the hand tracker's mode with the route, keeping a player's choice of the knuckles", () => {
+    expect(handModeFor('wand', 'finger')).toBe('wand');
+    expect(handModeFor('wand', 'grip')).toBe('wand');
+    expect(handModeFor('wand', 'wand')).toBeNull();
+    expect(handModeFor('hand', 'wand')).toBe('finger');
+    expect(handModeFor('hand', 'grip')).toBeNull();
+    expect(handModeFor('hand', 'finger')).toBeNull();
+    for (const r of ['glint', 'infrared', 'pointer'] as const) expect(handModeFor(r, 'wand')).toBeNull();
+  });
+});
+
+describe('the wand line (the hand tracker in wand mode)', () => {
+  it('counts the wand found when it is seen in most frames, learned or not', () => {
+    expect(wandFound(hand({ wand: { seen: 1, learned: false } }))).toBe(true);
+    expect(wandFound(hand({ wand: { seen: 0, learned: true } }))).toBe(true);
+    expect(wandFound(hand({ wand: { seen: 0.3, learned: false } }))).toBe(false);
+    expect(wandFound(hand({}))).toBe(false);
+    expect(trackerLine(hand({ state: 'tracking', wand: { seen: 1, learned: false } }), 'wand')).toEqual({ tone: 'ok', text: 'Wand found. Hold still, then trace a spell.' });
+  });
+
+  it('finds the hand first, then the wand, and says when the wand is not seen', () => {
+    expect(trackerLine(hand({ state: 'tracking', wand: { seen: 0.2, learned: false } }), 'wand')).toEqual({ tone: 'wait', text: 'Hand found. Now hold the wand up so the camera sees all of it.' });
+    expect(trackerLine(hand({ state: 'tracking', wand: { seen: 0.9, learned: true } }), 'wand')).toEqual({ tone: 'ok', text: 'Wand found. Hold still, then trace a spell.' });
+    expect(trackerLine(hand({ state: 'tracking', hint: 'wand-not-seen', wand: { seen: 0, learned: false } }), 'wand')).toEqual({ tone: 'warn', text: TEXT.wandNotSeen });
+    expect(trackerLine(hand({ state: 'searching', hint: 'hand-not-found' }), 'wand')).toEqual({ tone: 'warn', text: TEXT.wandHandNotFound });
+    expect(trackerLine(hand({ state: 'tracking', hint: 'hand-too-small' }), 'wand')).toEqual({ tone: 'warn', text: TEXT.handTooSmall });
+    // The glint route keeps the bright tip's lines.
+    const glint = (s: Partial<TrackerStatus>): TrackerStatus => ({ ...hand(s), tracker: 'tracker.bright-tip' });
+    expect(trackerLine(glint({ state: 'searching', hint: 'tip-not-found' }), 'glint')).toEqual({ tone: 'warn', text: TEXT.tipNotFound });
+    expect(trackerLine(glint({ state: 'tracking' }), 'glint')).toEqual({ tone: 'ok', text: 'Wand found. Hold still, then trace a spell.' });
   });
 });

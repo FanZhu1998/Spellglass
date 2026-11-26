@@ -58,10 +58,19 @@ export interface TrackerStatus {
    *  @since 1.2 'hand-too-small' (the hand tracker): the hand is found but small in the frame, its
    *  median TipSample.size over the last second under 0.05, where detection starts to fail; cleared
    *  at 0.055 or more. It is decided on the frames with a hand and lasts while the last second holds
-   *  any, so a short loss of the tip does not clear it; it clears on stop() and with a new camera. */
-  hint?: 'tip-not-found' | 'hand-not-found' | 'too-many-lights' | 'hand-too-small' | null;
+   *  any, so a short loss of the tip does not clear it; it clears on stop() and with a new camera.
+   *  @since 1.3 'wand-not-seen' (the hand tracker in wand mode): the hand is held, but no wand has been
+   *  found in it for 3 s (since the hand was found, or since the wand was last seen); the tip is then
+   *  carried, or guessed past the knuckles. 'hand-not-found' and 'hand-too-small' come first. */
+  hint?: 'tip-not-found' | 'hand-not-found' | 'too-many-lights' | 'hand-too-small' | 'wand-not-seen' | null;
   /** @since 1.2 What this tracker's samples need from the segmenter (SegmentationNeeds). */
   segmentation?: SegmentationNeeds;
+  /** @since 1.3 The hand tracker in wand mode: the share of the last second's frames with a hand in which
+   *  the wand was found (0..1), and whether the tip's place in the hand has been learned (until it has, a
+   *  frame without the wand carries the place where it was last seen in the hand, and before it is seen in
+   *  a hold the tip is guessed past the knuckles). The wand counts as found while either holds (seen 0.5
+   *  or more, or learned). Absent in the other modes. */
+  wand?: { seen: number; learned: boolean };
 }
 
 /**
@@ -108,6 +117,12 @@ export interface TrackerDebugFrame {
   contrast?: number;
   /** Hand tracker: the 21 landmarks in caster space. */
   landmarks?: [number, number][];
+  /** @since 1.3 Hand tracker in wand mode, caster space: the shaft found in this frame (base, where it
+   *  leaves the hand, present when it was found), the tip published, the find's quality (0..1, 0 when none
+   *  was used) and where the tip came from: 'shaft' or 'glint' (seen), 'carried' (the wand's learned place
+   *  in the hand, or where it was last seen in it), 'grip' (projected past the knuckles before the wand has
+   *  been seen in this hold). */
+  wand?: { base?: [number, number]; tip: [number, number]; quality: number; source: 'shaft' | 'glint' | 'carried' | 'grip' };
 }
 
 // ------------------------------------------------------------------ capture

@@ -1,0 +1,695 @@
+{
+  "schema": "spellpack/1",
+  "id": "further-spells",
+  "version": "1.0.0",
+  "engine": ">=1.0 <2.0",
+  "title": "Further spells",
+  "description": "Twelve more: jinxes, counter-spells, and charms that change the size and speed of things.",
+  "needs": [
+    "fx.light@1",
+    "fx.particles@1",
+    "fx.props@1",
+    "fx.shapes@1",
+    "fx.scene@1",
+    "fx.text@1",
+    "audio@1"
+  ],
+  "spells": [
+    {
+      "id": "petrificus-totalus",
+      "incantation": "Petrificus Totalus",
+      "known_as": "Full body-bind",
+      "gesture_text": "A \"P\": straight up, then a bowl around to the middle.",
+      "description": "The dummy snaps rigid and topples.",
+      "basis": "app",
+      "heard_as": [
+        "petrificus totalis",
+        "petrify cus totalus",
+        "petri ficus totalus",
+        "petrificus total us",
+        "petrificus"
+      ],
+      "gesture": {
+        "path": [[0.3, 0.95], [0.3, 0.87], [0.3, 0.78], [0.3, 0.7], [0.3, 0.61], [0.3, 0.53], [0.3, 0.44], [0.3, 0.36], [0.3, 0.27], [0.3, 0.19], [0.3, 0.11], [0.33, 0.05], [0.41, 0.06], [0.5, 0.08], [0.57, 0.11], [0.65, 0.15], [0.7, 0.21], [0.72, 0.29], [0.69, 0.37], [0.62, 0.43], [0.55, 0.47], [0.47, 0.49], [0.38, 0.51], [0.3, 0.51]],
+        "parts": [
+          {
+            "until": 0.438,
+            "name": "the upstroke"
+          },
+          {
+            "until": 1,
+            "name": "the bowl",
+            "short_hint": "The bowl stopped short: bring it back to the middle of the upstroke."
+          }
+        ]
+      },
+      "targets": [
+        "prop.dummy"
+      ],
+      "effect": {
+        "steps": [
+          {
+            "use": "light.flash",
+            "at": "target",
+            "color": "#BFD8FF",
+            "intensity": 0.45,
+            "radius": 0.2
+          },
+          {
+            "use": "prop.freeze",
+            "topple": true,
+            "duration_ms": 6000
+          },
+          {
+            "use": "audio.cue",
+            "cue": "bind"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "duration_ms": 6000,
+      "ended_by": [
+        "finite-incantatem"
+      ],
+      "tier": 4
+    },
+    {
+      "id": "impedimenta",
+      "incantation": "Impedimenta",
+      "known_as": "Slows or stops a target",
+      "gesture_text": "A \"J\": straight down, then hook to the left.",
+      "description": "The dummy moves in slow motion.",
+      "basis": "app",
+      "heard_as": [
+        "impedi menta",
+        "impede a menta",
+        "impediment a",
+        "impedimento",
+        "impedimenta"
+      ],
+      "gesture": {
+        "path": [[0.7, 0.05], [0.7, 0.11], [0.7, 0.17], [0.7, 0.24], [0.7, 0.3], [0.7, 0.36], [0.7, 0.42], [0.7, 0.49], [0.7, 0.55], [0.7, 0.61], [0.7, 0.67], [0.69, 0.73], [0.67, 0.79], [0.63, 0.84], [0.58, 0.89], [0.53, 0.92], [0.47, 0.93], [0.41, 0.93], [0.35, 0.91], [0.3, 0.87], [0.26, 0.83], [0.22, 0.77], [0.21, 0.71], [0.2, 0.65]],
+        "parts": [
+          {
+            "until": 0.432,
+            "name": "the downstroke"
+          },
+          {
+            "until": 1,
+            "name": "the hook",
+            "short_hint": "The hook stopped short: curl it up at the end."
+          }
+        ]
+      },
+      "targets": [
+        "prop.dummy"
+      ],
+      "effect": {
+        "steps": [
+          {
+            "use": "prop.reel",
+            "intensity": 0.6
+          },
+          {
+            "use": "time.slow",
+            "scope": "target",
+            "factor": 0.2,
+            "duration_ms": 5000
+          },
+          {
+            "use": "particles.burst",
+            "preset": "mist",
+            "at": "target",
+            "count": 24
+          },
+          {
+            "use": "audio.cue",
+            "cue": "slow"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "duration_ms": 5000,
+      "ended_by": [
+        "finite-incantatem"
+      ],
+      "tier": 4
+    },
+    {
+      "id": "riddikulus",
+      "incantation": "Riddikulus",
+      "known_as": "Makes a Boggart laughable",
+      "gesture_text": "A \"W\".",
+      "description": "The dummy gets a silly costume.",
+      "basis": "app",
+      "heard_as": [
+        "ridiculous",
+        "ridiculus",
+        "riddick u lus",
+        "ridikulus",
+        "riddikulous"
+      ],
+      "gesture": {
+        "path": [[0.05, 0.15], [0.09, 0.26], [0.12, 0.37], [0.16, 0.48], [0.19, 0.59], [0.23, 0.7], [0.27, 0.81], [0.31, 0.78], [0.35, 0.68], [0.39, 0.57], [0.44, 0.46], [0.48, 0.35], [0.52, 0.35], [0.56, 0.46], [0.61, 0.57], [0.65, 0.68], [0.69, 0.78], [0.73, 0.81], [0.77, 0.7], [0.81, 0.59], [0.84, 0.48], [0.88, 0.37], [0.91, 0.26], [0.95, 0.15]],
+        "parts": [
+          {
+            "until": 0.283,
+            "name": "the first stroke"
+          },
+          {
+            "until": 0.492,
+            "name": "the second stroke"
+          },
+          {
+            "until": 0.717,
+            "name": "the third stroke"
+          },
+          {
+            "until": 1,
+            "name": "the last stroke",
+            "short_hint": "The last stroke stopped short: finish the W up high."
+          }
+        ]
+      },
+      "targets": [
+        "prop.dummy"
+      ],
+      "effect": {
+        "steps": [
+          {
+            "use": "prop.costume",
+            "costume": "random"
+          },
+          {
+            "use": "particles.burst",
+            "preset": "sparks",
+            "at": "target",
+            "count": 30,
+            "color": "#F2B84B"
+          },
+          {
+            "use": "audio.cue",
+            "cue": "honk"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "tier": 4
+    },
+    {
+      "id": "revelio",
+      "incantation": "Revelio",
+      "known_as": "Reveals what is hidden",
+      "gesture_text": "A question mark: hook over the top, then straight down.",
+      "description": "Hidden ink and objects shimmer into view.",
+      "basis": "app",
+      "heard_as": [
+        "revel io",
+        "reveal io",
+        "revelia",
+        "rebellio",
+        "revel yo",
+        "revelo"
+      ],
+      "gesture": {
+        "path": [[0.25, 0.3], [0.26, 0.23], [0.29, 0.17], [0.33, 0.12], [0.39, 0.08], [0.45, 0.06], [0.52, 0.05], [0.59, 0.07], [0.65, 0.1], [0.7, 0.14], [0.73, 0.2], [0.75, 0.27], [0.75, 0.34], [0.73, 0.4], [0.69, 0.46], [0.64, 0.51], [0.58, 0.54], [0.51, 0.55], [0.5, 0.61], [0.5, 0.68], [0.5, 0.74], [0.5, 0.81], [0.5, 0.88], [0.5, 0.95]],
+        "parts": [
+          {
+            "until": 0.744,
+            "name": "the hook"
+          },
+          {
+            "until": 1,
+            "name": "the downstroke",
+            "short_hint": "The downstroke stopped short: drop straight down below the hook."
+          }
+        ]
+      },
+      "effect": {
+        "steps": [
+          {
+            "use": "scene.reveal",
+            "duration_ms": 6000
+          },
+          {
+            "use": "text.inscribe",
+            "style": "hidden-ink"
+          },
+          {
+            "use": "particles.burst",
+            "preset": "stars",
+            "at": "aim",
+            "count": 30
+          },
+          {
+            "use": "audio.cue",
+            "cue": "reveal"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "tier": 4
+    },
+    {
+      "id": "finite-incantatem",
+      "incantation": "Finite Incantatem",
+      "known_as": "Ends spell effects",
+      "gesture_text": "Flick right to left.",
+      "description": "Every active effect ends.",
+      "basis": "app",
+      "heard_as": [
+        "finite incantatum",
+        "finny tay incantatem",
+        "finite in can tatem",
+        "finitay incantatem",
+        "finite incantartem",
+        "finite"
+      ],
+      "gesture": {
+        "flick": "left"
+      },
+      "ends": [
+        "*"
+      ],
+      "effect": {
+        "steps": [
+          {
+            "use": "effects.end",
+            "scope": "all"
+          },
+          {
+            "use": "light.flash",
+            "at": "tip",
+            "color": "#E9DFC7",
+            "intensity": 0.35,
+            "radius": 0.18
+          },
+          {
+            "use": "audio.cue",
+            "cue": "dispel"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "cooldown_ms": 400,
+      "tier": 5
+    },
+    {
+      "id": "obliviate",
+      "incantation": "Obliviate",
+      "known_as": "Memory charm",
+      "gesture_text": "Spiral inward, two turns clockwise.",
+      "description": "Trails and the session log fade away.",
+      "basis": "app",
+      "heard_as": [
+        "oblivi ate",
+        "oblivion ate",
+        "oh blivy ate",
+        "obliviat",
+        "oblivee ate"
+      ],
+      "gesture": {
+        "path": [[0.5, 0.02], [0.64, 0.05], [0.77, 0.13], [0.86, 0.24], [0.92, 0.37], [0.92, 0.52], [0.88, 0.66], [0.79, 0.77], [0.67, 0.85], [0.53, 0.87], [0.38, 0.84], [0.27, 0.76], [0.19, 0.63], [0.18, 0.49], [0.24, 0.35], [0.35, 0.26], [0.49, 0.23], [0.63, 0.29], [0.71, 0.41], [0.7, 0.55], [0.59, 0.65], [0.45, 0.64], [0.39, 0.51], [0.5, 0.45]],
+        "parts": [
+          {
+            "until": 0.48,
+            "name": "the outer turn"
+          },
+          {
+            "until": 1,
+            "name": "the inner turn",
+            "short_hint": "The inner turn stopped short: spiral all the way into the centre."
+          }
+        ]
+      },
+      "effect": {
+        "steps": [
+          {
+            "use": "effects.end",
+            "scope": "trails"
+          },
+          {
+            "use": "log.fade"
+          },
+          {
+            "use": "particles.burst",
+            "preset": "mist",
+            "at": "center",
+            "count": 40
+          },
+          {
+            "use": "audio.cue",
+            "cue": "forget"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "tier": 5
+    },
+    {
+      "id": "reducto",
+      "incantation": "Reducto",
+      "known_as": "Blasts solid objects",
+      "gesture_text": "A one-stroke \"X\": down and right, straight up, then down and left.",
+      "description": "The target bursts to dust; Reparo restores it.",
+      "basis": "app",
+      "heard_as": [
+        "reduct oh",
+        "reduc toe",
+        "ridocto",
+        "reduce toe",
+        "reducto"
+      ],
+      "gesture": {
+        "path": [[0.1, 0.1], [0.19, 0.19], [0.29, 0.29], [0.38, 0.38], [0.48, 0.48], [0.57, 0.57], [0.66, 0.66], [0.76, 0.76], [0.85, 0.85], [0.9, 0.83], [0.9, 0.7], [0.9, 0.57], [0.9, 0.43], [0.9, 0.3], [0.9, 0.17], [0.85, 0.15], [0.76, 0.24], [0.66, 0.34], [0.57, 0.43], [0.48, 0.52], [0.38, 0.62], [0.29, 0.71], [0.19, 0.81], [0.1, 0.9]],
+        "parts": [
+          {
+            "until": 0.367,
+            "name": "the first diagonal"
+          },
+          {
+            "until": 0.633,
+            "name": "the upstroke"
+          },
+          {
+            "until": 1,
+            "name": "the last diagonal",
+            "short_hint": "The last diagonal stopped short: carry it down to the far corner."
+          }
+        ]
+      },
+      "targets": [
+        "prop.breakable"
+      ],
+      "effect": {
+        "steps": [
+          {
+            "use": "bolt.cast",
+            "from": "tip",
+            "to": "target",
+            "color": "#9FD3FF"
+          },
+          {
+            "use": "prop.scale",
+            "factor": 0,
+            "mode": "shatter",
+            "delay_ms": 180
+          },
+          {
+            "use": "particles.burst",
+            "preset": "dust",
+            "at": "target",
+            "count": 60,
+            "delay_ms": 180
+          },
+          {
+            "use": "screen.shake",
+            "intensity": 0.4,
+            "duration_ms": 300,
+            "delay_ms": 180
+          },
+          {
+            "use": "audio.cue",
+            "cue": "blast"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "tier": 5
+    },
+    {
+      "id": "arresto-momentum",
+      "incantation": "Arresto Momentum",
+      "known_as": "Slows moving things",
+      "gesture_text": "An \"M\" from the lower left.",
+      "description": "Everything in motion slows to a stop.",
+      "basis": "park",
+      "heard_as": [
+        "a rest o momentum",
+        "arrest o momentum",
+        "arresto moment um",
+        "arresto momentous",
+        "arresto"
+      ],
+      "gesture": {
+        "path": [[0.08, 0.9], [0.08, 0.76], [0.08, 0.62], [0.08, 0.48], [0.08, 0.34], [0.08, 0.2], [0.1, 0.14], [0.17, 0.26], [0.25, 0.38], [0.32, 0.5], [0.39, 0.62], [0.46, 0.74], [0.54, 0.74], [0.61, 0.62], [0.68, 0.5], [0.75, 0.38], [0.83, 0.26], [0.9, 0.14], [0.92, 0.2], [0.92, 0.34], [0.92, 0.48], [0.92, 0.62], [0.92, 0.76], [0.92, 0.9]],
+        "parts": [
+          {
+            "until": 0.254,
+            "name": "the first upstroke"
+          },
+          {
+            "until": 0.513,
+            "name": "the first diagonal"
+          },
+          {
+            "until": 0.746,
+            "name": "the second diagonal"
+          },
+          {
+            "until": 1,
+            "name": "the last downstroke",
+            "short_hint": "The last downstroke stopped short: bring it all the way down."
+          }
+        ]
+      },
+      "effect": {
+        "steps": [
+          {
+            "use": "time.slow",
+            "scope": "all",
+            "to_stop": true,
+            "duration_ms": 5000
+          },
+          {
+            "use": "particles.burst",
+            "preset": "mist",
+            "at": "aim",
+            "count": 30
+          },
+          {
+            "use": "audio.cue",
+            "cue": "slow"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "duration_ms": 5000,
+      "ended_by": [
+        "finite-incantatem"
+      ],
+      "tier": 5
+    },
+    {
+      "id": "muffliato",
+      "incantation": "Muffliato",
+      "known_as": "Fills nearby ears with buzzing",
+      "gesture_text": "A \"6\": down the left side, then close a loop at the bottom.",
+      "description": "Sound is muffled until Finite.",
+      "basis": "app",
+      "heard_as": [
+        "muffle ato",
+        "mufflee auto",
+        "muffliatto",
+        "muffle yacht oh",
+        "muffliato"
+      ],
+      "gesture": {
+        "path": [[0.67, 0.06], [0.55, 0.03], [0.44, 0.05], [0.34, 0.12], [0.26, 0.21], [0.22, 0.32], [0.2, 0.44], [0.2, 0.56], [0.2, 0.68], [0.23, 0.79], [0.3, 0.88], [0.41, 0.94], [0.53, 0.95], [0.64, 0.92], [0.74, 0.85], [0.79, 0.74], [0.79, 0.62], [0.74, 0.52], [0.64, 0.44], [0.53, 0.41], [0.41, 0.42], [0.31, 0.48], [0.23, 0.57], [0.2, 0.68]],
+        "parts": [
+          {
+            "until": 0.523,
+            "name": "the downstroke"
+          },
+          {
+            "until": 1,
+            "name": "the loop",
+            "short_hint": "The loop stopped short: close it at the bottom."
+          }
+        ]
+      },
+      "effect": {
+        "steps": [
+          {
+            "use": "audio.muffle",
+            "hold": true
+          },
+          {
+            "use": "particles.burst",
+            "preset": "mist",
+            "at": "caster",
+            "count": 30
+          },
+          {
+            "use": "audio.cue",
+            "cue": "buzz"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "ended_by": [
+        "finite-incantatem"
+      ],
+      "tier": 6
+    },
+    {
+      "id": "locomotor",
+      "incantation": "Locomotor",
+      "known_as": "Moves objects",
+      "gesture_text": "An \"L\": down, then right.",
+      "description": "The target slides wherever you point.",
+      "basis": "app",
+      "heard_as": [
+        "locomotive",
+        "loco motor",
+        "local motor",
+        "locomoter",
+        "loco mortar"
+      ],
+      "gesture": {
+        "path": [[0.2, 0.05], [0.2, 0.12], [0.2, 0.18], [0.2, 0.25], [0.2, 0.32], [0.2, 0.39], [0.2, 0.45], [0.2, 0.52], [0.2, 0.59], [0.2, 0.66], [0.2, 0.72], [0.2, 0.79], [0.2, 0.86], [0.23, 0.9], [0.29, 0.9], [0.36, 0.9], [0.43, 0.9], [0.5, 0.9], [0.56, 0.9], [0.63, 0.9], [0.7, 0.9], [0.77, 0.9], [0.83, 0.9], [0.9, 0.9]],
+        "parts": [
+          {
+            "until": 0.562,
+            "name": "the downstroke"
+          },
+          {
+            "until": 1,
+            "name": "the crossbar",
+            "short_hint": "The crossbar stopped short: carry it further to the right."
+          }
+        ]
+      },
+      "targets": [
+        "prop.movable"
+      ],
+      "effect": {
+        "steps": [
+          {
+            "use": "prop.push",
+            "mode": "follow",
+            "duration_ms": 5000
+          },
+          {
+            "use": "audio.cue",
+            "cue": "slide"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "duration_ms": 5000,
+      "ended_by": [
+        "finite-incantatem"
+      ],
+      "tier": 6
+    },
+    {
+      "id": "engorgio",
+      "incantation": "Engorgio",
+      "known_as": "Enlarges",
+      "gesture_text": "A caret: up, then down.",
+      "description": "The target grows.",
+      "basis": "app",
+      "heard_as": [
+        "engorge io",
+        "in gorgeo",
+        "engorgeo",
+        "en gorge yo",
+        "engorgio"
+      ],
+      "gesture": {
+        "path": [[0.1, 0.9], [0.13, 0.83], [0.17, 0.76], [0.2, 0.69], [0.24, 0.62], [0.27, 0.55], [0.31, 0.48], [0.34, 0.41], [0.38, 0.34], [0.41, 0.27], [0.45, 0.2], [0.48, 0.13], [0.52, 0.13], [0.55, 0.2], [0.59, 0.27], [0.62, 0.34], [0.66, 0.41], [0.69, 0.48], [0.73, 0.55], [0.76, 0.62], [0.8, 0.69], [0.83, 0.76], [0.87, 0.83], [0.9, 0.9]],
+        "parts": [
+          {
+            "until": 0.489,
+            "name": "the upstroke"
+          },
+          {
+            "until": 1,
+            "name": "the downstroke",
+            "short_hint": "The downstroke stopped short: bring it back down to where you began."
+          }
+        ]
+      },
+      "targets": [
+        "prop.scalable"
+      ],
+      "effect": {
+        "steps": [
+          {
+            "use": "prop.scale",
+            "factor": 1.6,
+            "mode": "grow",
+            "duration_ms": 8000
+          },
+          {
+            "use": "particles.burst",
+            "preset": "sparks",
+            "at": "target",
+            "count": 24
+          },
+          {
+            "use": "audio.cue",
+            "cue": "grow"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "tier": 6
+    },
+    {
+      "id": "reducio",
+      "incantation": "Reducio",
+      "known_as": "Shrinks",
+      "gesture_text": "A vee: down, then up.",
+      "description": "The target shrinks.",
+      "basis": "app",
+      "heard_as": [
+        "reduce io",
+        "reduceo",
+        "re deuce io",
+        "reducey oh",
+        "reducio"
+      ],
+      "gesture": {
+        "path": [[0.1, 0.1], [0.13, 0.17], [0.17, 0.24], [0.2, 0.31], [0.24, 0.38], [0.27, 0.45], [0.31, 0.52], [0.34, 0.59], [0.38, 0.66], [0.41, 0.73], [0.45, 0.8], [0.48, 0.87], [0.52, 0.87], [0.55, 0.8], [0.59, 0.73], [0.62, 0.66], [0.66, 0.59], [0.69, 0.52], [0.73, 0.45], [0.76, 0.38], [0.8, 0.31], [0.83, 0.24], [0.87, 0.17], [0.9, 0.1]],
+        "parts": [
+          {
+            "until": 0.489,
+            "name": "the downstroke"
+          },
+          {
+            "until": 1,
+            "name": "the upstroke",
+            "short_hint": "The upstroke stopped short: rise back to where you began."
+          }
+        ]
+      },
+      "targets": [
+        "prop.scalable"
+      ],
+      "effect": {
+        "steps": [
+          {
+            "use": "prop.scale",
+            "factor": 0.55,
+            "mode": "shrink",
+            "duration_ms": 8000
+          },
+          {
+            "use": "particles.burst",
+            "preset": "stars",
+            "at": "target",
+            "count": 16
+          },
+          {
+            "use": "audio.cue",
+            "cue": "shrink"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "tier": 6
+    }
+  ]
+}

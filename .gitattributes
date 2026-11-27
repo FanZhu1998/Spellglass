@@ -1,0 +1,8 @@
+# Pack files are hashed byte for byte (public/packs/index.json), so line endings must never change.
+* text=auto eol=lf
+*.png binary
+*.woff2 binary
+*.y4m binary
+*.task binary
+*.wasm binary
+*.bmp binary

@@ -1,0 +1,103 @@
+@import '@fontsource/im-fell-english/latin-400.css';
+@import '@fontsource/im-fell-english/latin-400-italic.css';
+@import '@fontsource/spectral/latin-400.css';
+@import '@fontsource/spectral/latin-400-italic.css';
+@import '@fontsource/spectral/latin-600.css';
+/* Small capitals for labels and engraved words, and the ornate capitals of the wordmark and the
+   spellbook's drop caps. Both are under the SIL Open Font License and ship with the app (offline). */
+@import '@fontsource/im-fell-english-sc/latin-400.css';
+@import '@fontsource/cinzel-decorative/latin-700.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--night);
+  color: var(--vellum);
+  font-family: var(--font-text);
+  font-size: var(--text-body);
+  line-height: var(--leading);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* Old-style figures sit with the old type ("2 of 3"); tables of numbers ask for tabular ones. */
+  font-variant-numeric: oldstyle-nums;
+}
+
+body {
+  overflow: hidden;
+}
+
+#app {
+  height: 100%;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  line-height: 1.15;
+  margin: 0 0 0.4em;
+  letter-spacing: 0.005em;
+}
+
+h1 { font-size: 34px; }
+h2 { font-size: 28px; }
+h3 { font-size: 22px; }
+
+p {
+  margin: 0 0 0.8em;
+}
+
+a {
+  color: var(--candle);
+  text-underline-offset: 3px;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+  border-radius: var(--radius-small);
+}
+
+/* Headings and regions that take focus only so a screen reader starts there (dialogs, drawers,
+   pages) are not controls: no ring. */
+[tabindex='-1']:focus-visible {
+  box-shadow: none;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+::selection {
+  background: var(--candle-soft);
+}
+
+/* Scrollbars: a thin gilt thread on dark grounds, ink on parchment (components.css). */
+* {
+  scrollbar-color: color-mix(in srgb, var(--gilt) 38%, transparent) transparent;
+  scrollbar-width: thin;
+}

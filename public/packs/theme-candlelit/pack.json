@@ -1,0 +1,116 @@
+{
+  "schema": "themepack/1",
+  "id": "candlelit",
+  "version": "1.1.0",
+  "title": "Candlelit mirror",
+  "tokens": {
+    "night": "#0F1424",
+    "slate": "#232A3B",
+    "vellum": "#E9DFC7",
+    "ink": "#2B2118",
+    "candle": "#F2B84B",
+    "oxblood": "#7B1E2B",
+    "verdigris": "#5FB3A5",
+    "ash": "#ABA597"
+  },
+  "accents": {
+    "crimson-gold": {
+      "label": "Crimson and gold",
+      "candle": "#E3B341",
+      "oxblood": "#8E1B2A"
+    },
+    "emerald-silver": {
+      "label": "Emerald and silver",
+      "candle": "#CBD2DC",
+      "oxblood": "#1E5E3F"
+    },
+    "sapphire-bronze": {
+      "label": "Sapphire and bronze",
+      "candle": "#CD9358",
+      "oxblood": "#1F3F7A"
+    },
+    "amber-black": {
+      "label": "Amber and black",
+      "candle": "#F0B323",
+      "oxblood": "#1B1B1F"
+    }
+  },
+  "fonts": {
+    "display": "IM Fell English",
+    "text": "Spectral",
+    "label": "IM Fell English SC",
+    "ornate": "Cinzel Decorative"
+  },
+  "grades": {
+    "cast": [
+      {
+        "min": 0.9,
+        "label": "Outstanding"
+      },
+      {
+        "min": 0.8,
+        "label": "Exceeds Expectations"
+      },
+      {
+        "min": 0,
+        "label": "Acceptable"
+      }
+    ],
+    "fizzle": [
+      {
+        "min": 0.6,
+        "label": "Poor"
+      },
+      {
+        "min": 0.45,
+        "label": "Dreadful"
+      },
+      {
+        "min": 0,
+        "label": "Troll"
+      }
+    ]
+  },
+  "hidden_ink": [
+    "Hidden things only wait to be asked.",
+    "The glass remembers every light.",
+    "Look twice: the room is larger.",
+    "Every lock was once a promise.",
+    "Ink fades. Intent does not.",
+    "Some doors open only for the patient."
+  ],
+  "captions": {
+    "chime": "Chime",
+    "chime-rise": "Rising chime",
+    "snuff": "Soft puff of air",
+    "swish-lift": "Airy swish",
+    "latch": "Latch clicks open",
+    "whoosh-in": "Whoosh toward you",
+    "bolt": "Crackling bolt",
+    "stun": "Sharp crack",
+    "shield": "Low shimmering hum",
+    "patronus": "Bright choral swell",
+    "mend": "Tinkling chimes",
+    "fire": "Flames roar up",
+    "water": "Rushing water",
+    "bind": "Stiff snap",
+    "slow": "Sound slows and deepens",
+    "honk": "Silly honk",
+    "reveal": "Glittering shimmer",
+    "dispel": "A swell that fades away",
+    "forget": "Airy hush",
+    "blast": "Blast",
+    "buzz": "Low buzzing",
+    "slide": "Scraping slide",
+    "grow": "Rising stretch",
+    "shrink": "Falling squeak",
+    "curse-hum": "Eerie hum",
+    "crackle": "Harsh crackle",
+    "doom": "Deep boom",
+    "fizzle": "Fizzle",
+    "arm-tick": "Soft tick",
+    "page-turn": "Page turns",
+    "unlock-tier": "Bright fanfare",
+    "shutter": "Shutter click"
+  }
+}

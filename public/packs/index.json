@@ -1,0 +1,33 @@
+{
+  "schema": "packindex/1",
+  "packs": [
+    {
+      "id": "core-charms",
+      "kind": "spellpack",
+      "version": "1.0.0",
+      "path": "core-charms/pack.json",
+      "sha256": "3c7892fa870d0950739d1cdeded42e55b9dfaf04258a755eabf95f0eff911ae2"
+    },
+    {
+      "id": "further-spells",
+      "kind": "spellpack",
+      "version": "1.0.0",
+      "path": "further-spells/pack.json",
+      "sha256": "46fea4c84f2443b8430acb4bfc7875d093e58125fc16a480f5e486882c5d1665"
+    },
+    {
+      "id": "restricted-section",
+      "kind": "spellpack",
+      "version": "1.0.0",
+      "path": "restricted-section/pack.json",
+      "sha256": "6488b98cd2f7ce0efc0d741905a4accbc7c0f8bf19609fb3591bd5a5ddb7605b"
+    },
+    {
+      "id": "candlelit",
+      "kind": "themepack",
+      "version": "1.1.0",
+      "path": "theme-candlelit/pack.json",
+      "sha256": "8ce5d7b495c1da2689c8551d9e83e35093d0e0b734196a954478fe81e91ec08b"
+    }
+  ]
+}

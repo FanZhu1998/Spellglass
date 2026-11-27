@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spellpack-0.json",
+  "title": "Spellglass spell pack, format spellpack/0 (legacy)",
+  "description": "The pre-release spell pack format, from before contract 1.0. Nothing ships in it any more; Spellglass still reads it so the migration chain is real and tested (Section 9.1 rule 4, Section 13 'Legacy packs'; TypeScript shape in src/contracts/packs.ts SpellPackV0). Differences from spellpack/1: the pack has 'name' instead of 'title' and no 'engine' or 'needs'; each spell has 'words' instead of 'incantation', 'shape' instead of 'gesture', and 'effect' is a bare list of steps with no fallback. Migration to spellpack/1 (src/kernel/packs/migrate.ts) renames name to title, words to incantation and shape to gesture, wraps the step list as { steps, fallback: 'sparkle' }, sets engine to '>=1.0 <2.0' and sets needs to the capabilities of the steps the pack uses. Unknown fields are kept. Stored files are never rewritten; the migration runs every time the pack loads.",
+  "type": "object",
+  "required": ["schema", "id", "version", "name", "spells"],
+  "properties": {
+    "schema": { "type": "string", "const": "spellpack/0" },
+    "id": { "$ref": "common-1.json#/definitions/id" },
+    "version": { "$ref": "common-1.json#/definitions/version" },
+    "name": { "$ref": "common-1.json#/definitions/shortText" },
+    "spells": {
+      "type": "array",
+      "maxItems": 200,
+      "items": { "$ref": "#/definitions/spell" }
+    }
+  },
+  "definitions": {
+    "spell": {
+      "type": "object",
+      "required": ["id", "words", "shape", "effect"],
+      "properties": {
+        "id": { "$ref": "common-1.json#/definitions/id" },
+        "words": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "shape": { "$ref": "common-1.json#/definitions/gesture" },
+        "effect": { "$ref": "common-1.json#/definitions/effectSteps" },
+        "needs_active": { "$ref": "common-1.json#/definitions/idList" },
+        "ends": { "$ref": "common-1.json#/definitions/spellRefs" },
+        "ended_by": { "$ref": "common-1.json#/definitions/idList" },
+        "targets": { "$ref": "common-1.json#/definitions/targets" },
+        "tier": { "$ref": "common-1.json#/definitions/tier" }
+      }
+    }
+  }
+}

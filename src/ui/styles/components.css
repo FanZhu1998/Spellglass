@@ -1,0 +1,1005 @@
+/* Shared interface pieces. Screens compose these classes; keep new one-off styles in the screen.
+   Each piece is made of something in the study (art direction): engraved brass plates for buttons,
+   wax for the primary action, brass tags for status, parchment pages, and leather folios with
+   gilt tooling for the drawers. Shapes stay square-shouldered: plates have cut corners, not pills. */
+
+:root {
+  /* The wax seal's sigil, pressed into whatever wax the accent pair gives: a hand mirror holding a
+     star inside a ring of dots. Alpha only, so it shows as an impression in any color. */
+  --sigil: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cdefs%3E%3Cg id='s' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='20' cy='20' r='16.4' stroke-width='1.3'/%3E%3Ccircle cx='20' cy='20' r='13.4' stroke-width='1.7' stroke-dasharray='.01 3.05'/%3E%3Cellipse cx='20' cy='17.4' rx='5.4' ry='6.8' stroke-width='1.5'/%3E%3Cpath d='M20 24.3v6.2M17.7 30.6h4.6' stroke-width='1.5'/%3E%3Cpath d='M20 13.2l.95 3.25 3.25.95-3.25.95-.95 3.25-.95-3.25-3.25-.95 3.25-.95z' stroke-width='.6'/%3E%3C/g%3E%3C/defs%3E%3Cuse href='%23s' transform='translate(-.45 -.45)' stroke='%23000' stroke-opacity='.5' fill-opacity='0'/%3E%3Cuse href='%23s' transform='translate(.5 .55)' stroke='%23fff' stroke-opacity='.26'/%3E%3Cpath d='M20 13.2l.95 3.25 3.25.95-3.25.95-.95 3.25-.95-3.25-3.25-.95 3.25-.95z' fill='%23000' fill-opacity='.38'/%3E%3C/svg%3E");
+  /* A panel let into a folio (a choice, a pack, a keepsake): sunk a little below the leather and
+     rimmed with a gilt hairline; chosen, the rim is full gold and the candle warms the panel. The
+     chosen one also carries a wax dot (--inlay-seal), so the choice never rests on color alone. */
+  --inlay-bg: linear-gradient(180deg, rgb(0 0 0 / 0.2), rgb(0 0 0 / 0.3));
+  --inlay-edge: color-mix(in srgb, var(--gilt) 28%, transparent);
+  --inlay-edge-hover: color-mix(in srgb, var(--gilt) 55%, transparent);
+  --inlay-shadow: inset 0 1px 4px rgb(0 0 0 / 0.5), 0 1px 0 rgb(255 230 180 / 0.05);
+  --inlay-chosen-bg:
+    radial-gradient(90% 120% at 15% 0%, color-mix(in srgb, var(--candle) 14%, transparent), transparent 70%),
+    linear-gradient(180deg, rgb(0 0 0 / 0.12), rgb(0 0 0 / 0.22));
+  --inlay-chosen-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gilt) 30%, transparent), inset 0 1px 4px rgb(0 0 0 / 0.4), 0 0 14px color-mix(in srgb, var(--candle) 12%, transparent);
+  --inlay-seal: radial-gradient(circle at 36% 30%, color-mix(in srgb, var(--oxblood) 70%, #ffd2c4), var(--oxblood) 55%, var(--oxblood-2));
+  --inlay-seal-ring: 0 0 0 1.5px color-mix(in srgb, var(--oxblood) 60%, black), 0 0 0 3px color-mix(in srgb, var(--oxblood) 80%, #ffc0b0), 1px 2px 3px rgb(0 0 0 / 0.5);
+
+  /* Tooled corners for the folios' gilt rule: a small four-petalled flower with two tendrils. */
+  --tool-corner: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cg fill='none' stroke='%23c9a356' stroke-linecap='round' stroke-opacity='.85'%3E%3Cpath d='M9 9c6 1 9 4 10 10M9 9c1 6 4 9 10 10' stroke-width='1.1'/%3E%3Cpath d='M19 19c3-1 6 0 8 3M19 19c-1 3 0 6 3 8' stroke-width='.9'/%3E%3Cpath d='M16 9.6c2.5-2 5.5-2.4 8-.8M9.6 16c-2 2.5-2.4 5.5-.8 8' stroke-width='.9'/%3E%3C/g%3E%3Cg fill='%23c9a356'%3E%3Ccircle cx='9' cy='9' r='2.4'/%3E%3Ccircle cx='24.4' cy='8.4' r='1.1'/%3E%3Ccircle cx='8.4' cy='24.4' r='1.1'/%3E%3Ccircle cx='27.4' cy='22.6' r='.9'/%3E%3Ccircle cx='22.6' cy='27.4' r='.9'/%3E%3C/g%3E%3Ccircle cx='9' cy='9' r='1' fill='%233e2c12'/%3E%3C/svg%3E");
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+/* An engraved plate of aged brass: a polished rim around a dark, patinated field, the words raised
+   in gilt. Cut corners, not a pill. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 18px;
+  border-radius: 7px;
+  corner-shape: bevel;
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(180deg, rgb(255 236 190 / 0.1), rgb(255 236 190 / 0) 46%, rgb(0 0 0 / 0.16)) padding-box,
+    var(--tex-grain) 0 0 / 180px padding-box,
+    linear-gradient(180deg, var(--brass-field), var(--brass-field-2)) padding-box,
+    linear-gradient(180deg, #f0d99a 0%, #b8944c 38%, #6e5222 52%, #a8843f 68%, #dcc07c 100%) border-box;
+  background-blend-mode: normal, soft-light, normal, normal;
+  box-shadow:
+    inset 0 0 0 1px rgb(12 8 4 / 0.75),
+    inset 0 1px 0 1px rgb(255 232 180 / 0.07),
+    inset 0 -6px 10px -4px rgb(0 0 0 / 0.45),
+    0 0 0 1px rgb(6 4 2 / 0.6),
+    2px 4px 9px rgb(0 0 0 / 0.42);
+  color: var(--gilt-text);
+  font-family: var(--font-text);
+  font-size: var(--text-small);
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 0 rgb(0 0 0 / 0.75);
+  cursor: pointer;
+  text-decoration: none;
+  transition: filter var(--duration) var(--ease-out), transform 120ms var(--ease-out), box-shadow var(--duration) var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Candlelight finds the plate: the field warms and the rim brightens. */
+.btn:hover {
+  filter: brightness(1.16) saturate(1.06);
+}
+
+.btn:active {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 0 0 1px rgb(12 8 4 / 0.75),
+    inset 0 3px 8px rgb(0 0 0 / 0.55),
+    0 0 0 1px rgb(6 4 2 / 0.6),
+    1px 2px 4px rgb(0 0 0 / 0.45);
+}
+
+.btn:focus-visible {
+  box-shadow: var(--focus), 2px 4px 9px rgb(0 0 0 / 0.42);
+}
+
+.btn:disabled,
+.btn[aria-disabled='true'] {
+  opacity: 0.5;
+  filter: saturate(0.5);
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* The primary action, pressed in wax (Section 10.2: Oxblood): an uneven slab of sealing wax with a
+   raised rim, and the seal itself at its head bearing the sigil. */
+.btn-seal {
+  position: relative;
+  gap: 10px;
+  padding: 7px 22px 7px 9px;
+  border: 0;
+  border-radius: 15px 12px 16px 11px / 12px 16px 11px 15px;
+  corner-shape: round;
+  background:
+    radial-gradient(90% 70% at 22% 0%, rgb(255 205 190 / 0.22), transparent 60%),
+    radial-gradient(130% 140% at 80% 120%, rgb(0 0 0 / 0.38), transparent 62%),
+    linear-gradient(180deg, color-mix(in srgb, var(--oxblood) 92%, white), var(--oxblood) 40%, var(--oxblood-2));
+  box-shadow:
+    inset 0 0 0 1.5px color-mix(in srgb, var(--oxblood) 70%, black),
+    inset 0 0 0 3px color-mix(in srgb, var(--oxblood) 82%, #ffb4a3),
+    inset 0 0 0 4.5px color-mix(in srgb, var(--oxblood) 85%, black),
+    inset 0 -4px 7px rgb(0 0 0 / 0.38),
+    0 1px 1px rgb(0 0 0 / 0.5),
+    2px 5px 12px rgb(0 0 0 / 0.48);
+  color: var(--vellum);
+  font-weight: 600;
+  letter-spacing: 0.015em;
+  text-shadow: 0 1px 0 rgb(0 0 0 / 0.55);
+}
+
+/* The seal: a disc of the same wax bearing the sigil, set into the slab. */
+.btn-seal::before {
+  content: '';
+  flex: none;
+  width: 30px;
+  height: 30px;
+  margin: -2px 0 -2px -1px;
+  border-radius: 50%;
+  background:
+    var(--sigil) center / 100% 100% no-repeat,
+    radial-gradient(circle at 36% 30%, color-mix(in srgb, var(--oxblood) 78%, #ffd2c4), var(--oxblood) 52%, var(--oxblood-2) 100%);
+  box-shadow:
+    0 0 0 1.5px color-mix(in srgb, var(--oxblood) 60%, black),
+    0 0 0 3px color-mix(in srgb, var(--oxblood) 88%, #ffc0b0),
+    1px 2px 3px 2px rgb(0 0 0 / 0.35);
+}
+
+.btn-seal:hover {
+  filter: brightness(1.12) saturate(1.05);
+}
+
+.btn-seal:active {
+  box-shadow:
+    inset 0 0 0 1.5px color-mix(in srgb, var(--oxblood) 70%, black),
+    inset 0 0 0 3px color-mix(in srgb, var(--oxblood) 82%, #ffb4a3),
+    inset 0 3px 8px rgb(0 0 0 / 0.5),
+    1px 2px 5px rgb(0 0 0 / 0.5);
+}
+
+.btn-seal:focus-visible {
+  box-shadow: var(--focus), 2px 5px 12px rgb(0 0 0 / 0.48);
+}
+
+/* Not yet pressed: dull, matte wax that sits flat, its words still legible. */
+.btn-seal:disabled {
+  opacity: 0.92;
+  filter: saturate(0.3) brightness(0.8);
+  box-shadow:
+    inset 0 0 0 1.5px color-mix(in srgb, var(--oxblood) 70%, black),
+    inset 0 0 0 3px color-mix(in srgb, var(--oxblood) 90%, #ffb4a3),
+    inset 0 1px 3px rgb(0 0 0 / 0.35);
+}
+
+.btn-small.btn-seal::before {
+  width: 24px;
+  height: 24px;
+}
+
+/* A quiet control: words engraved straight into the surface, no plate. */
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--vellum);
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.7);
+}
+
+.btn-ghost:hover {
+  filter: none;
+  background: radial-gradient(70% 90% at 50% 50%, rgb(242 184 75 / 0.12), transparent 75%);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--gilt) 70%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 5px;
+}
+
+.btn-ghost:active {
+  box-shadow: none;
+}
+
+.btn-ghost:focus-visible {
+  box-shadow: var(--focus);
+}
+
+.btn-small {
+  position: relative;
+  min-height: 36px;
+  padding: 4px 14px;
+  font-size: var(--text-label);
+}
+
+.btn-small.btn-seal {
+  padding: 4px 16px 4px 7px;
+}
+
+/* Small buttons keep a 44 px target (Section 10.6): the hit area reaches past the drawn plate. */
+.btn-small::after {
+  content: '';
+  position: absolute;
+  inset: -4px -2px;
+}
+
+.btn-icon {
+  width: 44px;
+  padding: 0;
+}
+
+/* On parchment: a label pasted on the page, ruled twice in ink, the words in ink. */
+.on-vellum .btn {
+  border: 1px solid color-mix(in srgb, var(--ink) 58%, transparent);
+  background:
+    var(--tex-fibre) 0 0 / 260px,
+    linear-gradient(180deg, color-mix(in srgb, var(--vellum) 72%, white), color-mix(in srgb, var(--vellum) 90%, #d8c7a2));
+  background-blend-mode: soft-light, normal;
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--vellum) 70%, white),
+    inset 0 0 0 3px color-mix(in srgb, var(--ink) 32%, transparent),
+    0 1px 0 rgb(255 255 255 / 0.4),
+    1px 2px 4px rgb(60 36 12 / 0.22);
+  color: var(--ink);
+  text-shadow: none;
+}
+
+.on-vellum .btn:hover {
+  filter: none;
+  border-color: color-mix(in srgb, var(--ink) 80%, transparent);
+  background:
+    var(--tex-fibre) 0 0 / 260px,
+    linear-gradient(180deg, color-mix(in srgb, var(--vellum) 55%, white), color-mix(in srgb, var(--vellum) 82%, white));
+  background-blend-mode: soft-light, normal;
+}
+
+.on-vellum .btn:active {
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--vellum) 70%, white),
+    inset 0 0 0 3px color-mix(in srgb, var(--ink) 32%, transparent),
+    inset 0 2px 5px rgb(60 36 12 / 0.25);
+}
+
+.on-vellum .btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--candle);
+}
+
+/* The quieter control on vellum: the same label without its paper, ruled once in faded ink. */
+.on-vellum .btn-ghost {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--ink) 34%, transparent);
+  box-shadow: none;
+  color: var(--ink);
+}
+
+.on-vellum .btn-ghost:hover {
+  background: radial-gradient(70% 90% at 50% 50%, rgb(122 86 30 / 0.12), transparent 75%);
+  border-color: color-mix(in srgb, var(--ink) 62%, transparent);
+  text-decoration-color: color-mix(in srgb, var(--oxblood) 70%, transparent);
+}
+
+.on-vellum .btn-seal {
+  border: 0;
+  color: var(--vellum);
+  background:
+    radial-gradient(90% 70% at 22% 0%, rgb(255 205 190 / 0.22), transparent 60%),
+    radial-gradient(130% 140% at 80% 120%, rgb(0 0 0 / 0.38), transparent 62%),
+    linear-gradient(180deg, color-mix(in srgb, var(--oxblood) 92%, white), var(--oxblood) 40%, var(--oxblood-2));
+  background-blend-mode: normal;
+  box-shadow:
+    inset 0 0 0 1.5px color-mix(in srgb, var(--oxblood) 70%, black),
+    inset 0 0 0 3px color-mix(in srgb, var(--oxblood) 82%, #ffb4a3),
+    inset 0 0 0 4.5px color-mix(in srgb, var(--oxblood) 85%, black),
+    inset 0 -4px 7px rgb(0 0 0 / 0.38),
+    0 1px 1px rgb(40 20 10 / 0.45),
+    2px 4px 8px rgb(60 30 12 / 0.35);
+  text-shadow: 0 1px 0 rgb(0 0 0 / 0.55);
+}
+
+.on-vellum .btn-seal:hover {
+  filter: brightness(1.12) saturate(1.05);
+}
+
+.on-vellum .btn-seal:focus-visible {
+  box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--candle), 2px 4px 8px rgb(60 30 12 / 0.35);
+}
+
+/* ---------------------------------------------------------------- status chips */
+
+/* A small brass tag with an engraved word and an enamel inlay for its state. The tag's end is cut
+   to a point, like a tag that hangs from a nail. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 11px 2px 13px;
+  border: 1px solid #3a2a12;
+  border-radius: 12px 3px 3px 12px;
+  corner-shape: bevel round round bevel;
+  /* The eyelet punched at the tag's point, then the brass. */
+  background:
+    radial-gradient(circle at 6px 50%, #1d1408 0 1.6px, rgb(70 48 16 / 0.9) 2px, rgb(255 240 200 / 0.55) 2.4px, transparent 3px),
+    linear-gradient(180deg, rgb(255 248 220 / 0.32), rgb(255 248 220 / 0) 40%, rgb(60 40 10 / 0.12)),
+    var(--tex-grain) 0 0 / 180px,
+    linear-gradient(180deg, #d8bd79, #c19f58 55%, #b8964f);
+  background-blend-mode: normal, normal, soft-light, normal;
+  box-shadow:
+    inset 0 0 0 1px rgb(255 240 200 / 0.35),
+    inset 0 -1px 2px rgb(60 40 10 / 0.35),
+    1px 2px 4px rgb(0 0 0 / 0.45);
+  color: var(--ink);
+  font-family: var(--font-label);
+  font-size: 17px;
+  letter-spacing: 0.04em;
+  line-height: 1.45;
+  text-shadow: 0 1px 0 rgb(255 240 205 / 0.45);
+  white-space: nowrap;
+}
+
+/* The inlay: enamel in the state's color, ringed in dark metal. */
+.chip::before {
+  content: '';
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--enamel, var(--ink));
+  box-shadow: 0 0 0 1.5px rgb(40 26 8 / 0.75), inset 0 1px 1px rgb(255 255 255 / 0.4);
+}
+
+.chip[data-state='on'] { --enamel: #3f9a8b; }
+.chip[data-state='warn'] { --enamel: #e09a2a; }
+.chip[data-state='error'] { --enamel: #b8323f; }
+.chip[data-state='off'] { --enamel: transparent; }
+/* Shapes as well as colors (Section 10.6): on is a dot, off a ring, warn a diamond, error a square. */
+.chip[data-state='off']::before { box-shadow: inset 0 0 0 1.5px rgb(40 26 8 / 0.8); }
+.chip[data-state='warn']::before { border-radius: 1px; transform: rotate(45deg) scale(0.9); }
+.chip[data-state='error']::before { border-radius: 1px; }
+
+/* A chip that does something (the mic toggle): same look, a 44 px target, a hover. */
+.chip-button {
+  position: relative;
+  cursor: pointer;
+  transition: filter var(--duration) var(--ease-out);
+}
+
+.chip-button::after {
+  content: '';
+  position: absolute;
+  inset: -9px -3px;
+}
+
+.chip-button:hover {
+  filter: brightness(1.1);
+}
+
+.chip-button[aria-pressed='true'] {
+  box-shadow:
+    inset 0 0 0 1px rgb(255 240 200 / 0.35),
+    inset 0 2px 3px rgb(60 40 10 / 0.35),
+    1px 2px 4px rgb(0 0 0 / 0.45);
+}
+
+/* ---------------------------------------------------------------- panels and pages */
+
+/* A card of dark leather with a tooled gilt rule a few millimetres inside its edge. */
+.panel {
+  background:
+    var(--tex-leather) 0 0 / 200px,
+    linear-gradient(180deg, var(--folio-2), var(--folio));
+  background-blend-mode: soft-light, normal;
+  border: 1px solid #0b0806;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-panel), inset 0 0 0 1px rgb(255 230 180 / 0.05);
+  outline: 1px solid color-mix(in srgb, var(--gilt) 40%, transparent);
+  outline-offset: -6px;
+  color: var(--vellum);
+}
+
+.panel-section {
+  padding: 18px 22px;
+  border-top: 1px solid var(--line);
+}
+
+.panel-section:first-child {
+  border-top: 0;
+}
+
+.muted {
+  color: var(--ash);
+}
+
+/* Parchment: fibres, a little foxing, browner towards the edges, the edges themselves darkened as
+   old paper is. Text keeps to the light middle; every ink on it is checked against the darkest
+   tone under text (--vellum-2). */
+.page {
+  background:
+    var(--tex-fibre) 0 0 / 260px,
+    radial-gradient(9% 7% at 84% 12%, rgb(184 154 102 / 0.2), transparent 70%),
+    radial-gradient(6% 5% at 12% 78%, rgb(184 154 102 / 0.16), transparent 70%),
+    radial-gradient(14% 9% at 70% 92%, rgb(184 154 102 / 0.14), transparent 70%),
+    radial-gradient(140% 120% at 50% 38%, var(--parchment) 0%, var(--parchment) 46%, var(--vellum-2) 86%, color-mix(in srgb, var(--vellum-2) 70%, var(--parchment-edge)) 100%);
+  background-blend-mode: soft-light, normal, normal, normal, normal;
+  box-shadow: inset 0 0 0 1px rgb(110 76 30 / 0.28), inset 0 0 18px rgb(120 84 36 / 0.22);
+  color: var(--ink);
+  border-radius: 3px;
+}
+
+.page .muted,
+.on-vellum .muted {
+  color: var(--ink-soft);
+}
+
+/* Scrollbars on parchment: an ink thread. */
+.page,
+.page * {
+  scrollbar-color: rgb(43 33 24 / 0.32) transparent;
+}
+
+/* The ornamental rule: a hairline either side of a gilt lozenge (ink on parchment). Use on an empty
+   element, or as a ::before. */
+.rule-ornament {
+  height: 14px;
+  border: 0;
+  margin: 0;
+  background:
+    var(--rule-ornament) center / 120px 14px no-repeat,
+    linear-gradient(90deg, transparent, color-mix(in srgb, var(--gilt) 45%, transparent) 18%, color-mix(in srgb, var(--gilt) 45%, transparent) calc(50% - 60px), transparent calc(50% - 58px), transparent calc(50% + 58px), color-mix(in srgb, var(--gilt) 45%, transparent) calc(50% + 60px), color-mix(in srgb, var(--gilt) 45%, transparent) 82%, transparent) center / 100% 1px no-repeat;
+}
+
+.on-vellum .rule-ornament,
+.page .rule-ornament {
+  background:
+    var(--rule-ornament-ink) center / 120px 14px no-repeat,
+    linear-gradient(90deg, transparent, rgb(43 33 24 / 0.3) 18%, rgb(43 33 24 / 0.3) calc(50% - 60px), transparent calc(50% - 58px), transparent calc(50% + 58px), rgb(43 33 24 / 0.3) calc(50% + 60px), rgb(43 33 24 / 0.3) 82%, transparent) center / 100% 1px no-repeat;
+}
+
+/* An engraved label in small capitals (section kickers, running heads). */
+.engraved {
+  font-family: var(--font-label);
+  letter-spacing: 0.06em;
+}
+
+/* ---------------------------------------------------------------- form controls */
+
+.field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.field > label,
+.field-label {
+  font-size: var(--text-small);
+  color: var(--vellum);
+}
+
+.field-help {
+  font-size: var(--text-label);
+  color: var(--ash);
+  margin: 0;
+}
+
+/* A well sunk into the folio, rimmed in brass. */
+.select,
+.input {
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: var(--radius-small);
+  border: 1px solid color-mix(in srgb, var(--brass) 55%, black);
+  background: linear-gradient(180deg, #0d0a08, #16110d);
+  box-shadow: inset 0 2px 5px rgb(0 0 0 / 0.6), 0 1px 0 rgb(255 230 180 / 0.06);
+  color: var(--vellum);
+}
+
+.select:hover,
+.input:hover {
+  border-color: color-mix(in srgb, var(--gilt) 75%, black);
+}
+
+/* A slider: a rail of turned brass laid on the folio between two rows of gilt tooled ticks (a tick
+   each tenth of the way, longer at the ends and the middle), and a turned brass knob that runs along
+   it. Where the knob stands is the value; the ticks give the eye the scale. The ticks are spaced along
+   the knob's travel, which is the rail less the knob's own width. */
+input[type='range'] {
+  --knob: 22px;
+  --rail: 8px;
+  --tick: color-mix(in srgb, var(--gilt) 62%, transparent);
+  appearance: none;
+  width: 100%;
+  height: 30px;
+  margin: 0;
+  background-color: transparent;
+  /* Each tile draws its tick at its left edge; the first tile starts under the knob's centre at the
+     left end, so the last tick falls under it at the right end. Minor ticks above and below the
+     rail, then the longer ones. */
+  background-image:
+    linear-gradient(90deg, var(--tick) 0 1px, transparent 1px),
+    linear-gradient(90deg, var(--tick) 0 1px, transparent 1px),
+    linear-gradient(90deg, var(--tick) 0 1.5px, transparent 1.5px),
+    linear-gradient(90deg, var(--tick) 0 1.5px, transparent 1.5px);
+  background-size:
+    calc((100% - var(--knob)) / 10) 5px,
+    calc((100% - var(--knob)) / 10) 5px,
+    calc((100% - var(--knob)) / 2) 9px,
+    calc((100% - var(--knob)) / 2) 9px;
+  background-position:
+    calc(var(--knob) / 2) 3px,
+    calc(var(--knob) / 2) calc(100% - 3px),
+    calc(var(--knob) / 2) 0,
+    calc(var(--knob) / 2) 100%;
+  background-repeat: repeat-x;
+  cursor: pointer;
+}
+
+/* The rail: a rod of brass, lit along its top, with a fine line engraved down its length. */
+input[type='range']::-webkit-slider-runnable-track {
+  box-sizing: border-box;
+  height: var(--rail);
+  border-radius: 4px;
+  border: 1px solid #2e2009;
+  background:
+    linear-gradient(180deg, transparent 2.5px, rgb(46 32 9 / 0.7) 2.5px 3.5px, rgb(255 240 200 / 0.35) 3.5px 4.5px, transparent 4.5px),
+    linear-gradient(180deg, #f3dfa6 0%, #d4b46a 30%, #9b7a36 68%, #5f4519 100%);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.65), 0 0 0 1px rgb(0 0 0 / 0.25);
+}
+
+/* The knob: brass turned on a lathe, its rings catching the light from the upper left. */
+input[type='range']::-webkit-slider-thumb {
+  box-sizing: border-box;
+  appearance: none;
+  width: var(--knob);
+  height: var(--knob);
+  /* Centred on the rail's inner height (the rail's border is outside it). */
+  margin-top: calc((var(--rail) - 2px - var(--knob)) / 2);
+  border-radius: 50%;
+  border: 1px solid #3a2a10;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 3.2px, rgb(58 40 12 / 0.5) 3.6px, transparent 4.4px, transparent 6.6px, rgb(58 40 12 / 0.42) 7px, transparent 7.8px),
+    radial-gradient(circle at 36% 30%, #fff6d4 0, #ecd391 18%, #c9a356 46%, #8a6a2c 78%, #5a4019 100%);
+  box-shadow: 1px 2px 3px rgb(0 0 0 / 0.6), inset 0 0 0 1px rgb(255 240 200 / 0.25);
+  transition: transform 120ms var(--ease-out);
+}
+
+input[type='range']:active::-webkit-slider-thumb {
+  transform: scale(0.94);
+}
+
+input[type='range']::-moz-range-track {
+  height: 8px;
+  border-radius: 4px;
+  border: 1px solid #2e2009;
+  background: linear-gradient(180deg, #f3dfa6 0%, #d4b46a 30%, #9b7a36 68%, #5f4519 100%);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.65);
+}
+
+input[type='range']::-moz-range-thumb {
+  box-sizing: border-box;
+  width: var(--knob);
+  height: var(--knob);
+  border-radius: 50%;
+  border: 1px solid #3a2a10;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 3.2px, rgb(58 40 12 / 0.5) 3.6px, transparent 4.4px, transparent 6.6px, rgb(58 40 12 / 0.42) 7px, transparent 7.8px),
+    radial-gradient(circle at 36% 30%, #fff6d4 0, #ecd391 18%, #c9a356 46%, #8a6a2c 78%, #5a4019 100%);
+  box-shadow: 1px 2px 3px rgb(0 0 0 / 0.6);
+}
+
+/* The gold ring goes round the knob, which is what the keys move. */
+input[type='range']:focus-visible {
+  box-shadow: none;
+}
+
+input[type='range']:focus-visible::-webkit-slider-thumb {
+  box-shadow: var(--focus), 1px 2px 3px rgb(0 0 0 / 0.6);
+}
+
+input[type='range']:focus-visible::-moz-range-thumb {
+  box-shadow: var(--focus);
+}
+
+input[type='range']:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  filter: saturate(0.4);
+}
+
+/* Toggle: <label class="switch"><input type="checkbox" /> <span>Text</span></label>
+   A small brass slide bolt, as on a chest: a plate held by two slotted screws, a channel cut along
+   it, and a bolt with a turned knob that slides in the channel. Off, the bolt is drawn back to the
+   left and the channel stands open on the right; on, the bolt is shot across into the right end and
+   the channel stands open on the left. So on and off differ by where the bolt is, not by color. */
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.switch input {
+  /* The plate's fixed parts: the screws and the channel, drawn for a 60 by 28 plate. */
+  --bolt-plate: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='28' viewBox='0 0 60 28'%3E%3Cdefs%3E%3CradialGradient id='s' cx='.38' cy='.32' r='.75'%3E%3Cstop offset='0' stop-color='%23fbedc0'/%3E%3Cstop offset='.5' stop-color='%23c9a356'/%3E%3Cstop offset='1' stop-color='%235a4019'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cg stroke='%232e2009' stroke-width='.8'%3E%3Ccircle cx='6' cy='14' r='3.1' fill='url(%23s)'/%3E%3Ccircle cx='54' cy='14' r='3.1' fill='url(%23s)'/%3E%3C/g%3E%3Cpath d='M4.1 15.9 7.9 12.1M52.1 15.9 55.9 12.1' stroke='%232e2009' stroke-width='1.1' stroke-linecap='round'/%3E%3Cpath d='M4.6 16.6 8.4 12.8M52.6 16.6 56.4 12.8' stroke='%23fff3c4' stroke-opacity='.45' stroke-width='.6' stroke-linecap='round'/%3E%3Crect x='11.5' y='9.5' width='37' height='9' rx='1.6' fill='%23170f05' stroke='%233e2c12'/%3E%3Cpath d='M12.5 10.6h35' stroke='%23000' stroke-opacity='.7'/%3E%3Cpath d='M12.5 19h35' stroke='%23fff0c8' stroke-opacity='.4' stroke-width='.8'/%3E%3C/svg%3E");
+  appearance: none;
+  flex: none;
+  position: relative;
+  width: 60px;
+  height: 28px;
+  margin: 0;
+  border-radius: 5px;
+  corner-shape: bevel;
+  border: 1px solid #3a2a12;
+  background:
+    var(--bolt-plate) center / 60px 28px no-repeat,
+    linear-gradient(180deg, rgb(255 248 220 / 0.3), rgb(255 248 220 / 0) 45%, rgb(60 40 10 / 0.16)),
+    var(--tex-grain) 0 0 / 180px,
+    linear-gradient(180deg, #d6ba78, #bd9b55 55%, #a8873f);
+  background-blend-mode: normal, normal, soft-light, normal;
+  box-shadow:
+    inset 0 0 0 1px rgb(255 240 200 / 0.3),
+    inset 0 -1px 2px rgb(60 40 10 / 0.35),
+    1px 2px 4px rgb(0 0 0 / 0.5);
+  cursor: pointer;
+  transition: filter var(--duration) var(--ease-out);
+}
+
+/* The bolt: a short rod of polished brass lying in the channel... */
+.switch input::before,
+.switch input::after {
+  content: '';
+  position: absolute;
+  transition: transform var(--duration) var(--ease-out);
+}
+
+.switch input::before {
+  top: 10px;
+  left: 12px;
+  width: 23px;
+  height: 6px;
+  border-radius: 1.5px 3px 3px 1.5px;
+  background:
+    linear-gradient(90deg, transparent calc(100% - 3px), rgb(58 40 12 / 0.5) calc(100% - 3px) calc(100% - 2px), transparent calc(100% - 2px)),
+    linear-gradient(180deg, #fff1c4 0%, #dcbd74 32%, #9b7a36 70%, #5a4019 100%);
+  box-shadow: 0 1px 1px rgb(0 0 0 / 0.55);
+}
+
+/* ...and its knob, turned, standing up out of the channel at the bolt's near end. */
+.switch input::after {
+  top: 6px;
+  left: 12px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 2.4px, rgb(58 40 12 / 0.45) 2.8px, transparent 3.4px, transparent 5px, rgb(58 40 12 / 0.4) 5.4px, transparent 6px),
+    radial-gradient(circle at 36% 30%, #fff6d4 0, #ecd391 20%, #c9a356 50%, #7d5f27 82%, #4a3514 100%);
+  box-shadow: 1px 2px 2px rgb(0 0 0 / 0.55), inset 0 0 0 1px rgb(58 40 12 / 0.55);
+}
+
+/* Shot across: the bolt's end in the channel's far end. */
+.switch input:checked::before,
+.switch input:checked::after {
+  transform: translateX(13px);
+}
+
+.switch:hover input:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.switch input:focus-visible {
+  box-shadow: var(--focus), 1px 2px 4px rgb(0 0 0 / 0.5);
+}
+
+.switch input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  filter: saturate(0.4);
+}
+
+/* On parchment (the first run's letter): a box ruled in ink on the page. Ticked, it carries an inked
+   tick and a wax dot at its corner, as a chosen card does. */
+.on-vellum .switch input,
+.page .switch input {
+  width: 26px;
+  height: 26px;
+  border-radius: 2px;
+  corner-shape: round;
+  border: 1.5px solid color-mix(in srgb, var(--ink) 72%, transparent);
+  background:
+    var(--tex-fibre) 0 0 / 260px,
+    linear-gradient(180deg, color-mix(in srgb, var(--vellum) 60%, white), color-mix(in srgb, var(--vellum) 88%, #d8c7a2));
+  background-blend-mode: soft-light, normal;
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--vellum) 70%, white),
+    inset 0 0 0 3px color-mix(in srgb, var(--ink) 28%, transparent),
+    1px 1px 2px rgb(60 36 12 / 0.2);
+}
+
+.on-vellum .switch input::before,
+.page .switch input::before {
+  top: -4px;
+  right: -4px;
+  left: auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--inlay-seal);
+  box-shadow: var(--inlay-seal-ring);
+  transform: scale(0);
+}
+
+.on-vellum .switch input::after,
+.page .switch input::after {
+  inset: 0;
+  top: 0;
+  left: 0;
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  box-shadow: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cpath d='M5.2 13.6c1.6.6 3.1 2.2 4.4 4.6.4.7.9.7 1.2 0 2.3-5.1 5.4-9.2 10.3-12.6' fill='none' stroke='%232b2118' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M20.6 5.9c.5-.4 1.1-.6 1.4-.3' fill='none' stroke='%232b2118' stroke-width='1.2' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  opacity: 0;
+  transform: none;
+  transition: opacity var(--duration) var(--ease-out);
+}
+
+.on-vellum .switch input:checked::before,
+.page .switch input:checked::before {
+  transform: scale(1);
+}
+
+.on-vellum .switch input:checked::after,
+.page .switch input:checked::after {
+  opacity: 1;
+  transform: none;
+}
+
+.on-vellum .switch input:focus-visible,
+.page .switch input:focus-visible {
+  box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--candle);
+}
+
+/* A checkbox in a folio (a checklist, an option beside a button): <input type="checkbox" class="tick">.
+   A small well sunk into the leather and rimmed in brass; ticked, a gilt tick runs out over its rim,
+   as a hand ticks a list. */
+input[type='checkbox'].tick {
+  appearance: none;
+  flex: none;
+  position: relative;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  border-radius: 3px;
+  corner-shape: bevel;
+  border: 1px solid color-mix(in srgb, var(--brass) 72%, black);
+  background: linear-gradient(180deg, #0d0a08, #18120e);
+  box-shadow: inset 0 2px 4px rgb(0 0 0 / 0.65), 0 1px 0 rgb(255 230 180 / 0.08);
+  cursor: pointer;
+}
+
+input[type='checkbox'].tick::after {
+  content: '';
+  position: absolute;
+  inset: -5px -6px 1px 1px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 27 26'%3E%3Cpath d='M4.4 14.8c1.7.7 3.2 2.4 4.5 4.9.4.7.9.7 1.2 0 2.5-5.6 6-10.3 11.6-14.2' fill='none' stroke='%23140d06' stroke-opacity='.7' stroke-width='3.6' stroke-linecap='round' stroke-linejoin='round' transform='translate(.6 .8)'/%3E%3Cpath d='M4.4 14.8c1.7.7 3.2 2.4 4.5 4.9.4.7.9.7 1.2 0 2.5-5.6 6-10.3 11.6-14.2' fill='none' stroke='%23e2c47e' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  opacity: 0;
+  transition: opacity var(--duration) var(--ease-out);
+}
+
+input[type='checkbox'].tick:checked::after {
+  opacity: 1;
+}
+
+input[type='checkbox'].tick:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--gilt) 80%, black);
+}
+
+input[type='checkbox'].tick:focus-visible {
+  box-shadow: var(--focus);
+}
+
+input[type='checkbox'].tick:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Segmented choice: <div class="segmented" role="radiogroup"> <button aria-pressed>
+   A dark engraved bar; the chosen option is a raised brass plate with its words in ink. */
+.segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 6px;
+  corner-shape: bevel;
+  background: linear-gradient(180deg, #0d0a08, #17120d);
+  border: 1px solid color-mix(in srgb, var(--brass) 50%, black);
+  box-shadow: inset 0 2px 5px rgb(0 0 0 / 0.6), 0 1px 0 rgb(255 230 180 / 0.06);
+}
+
+.segmented button {
+  position: relative;
+  min-height: 36px;
+  padding: 4px 14px;
+  border-radius: 4px;
+  corner-shape: bevel;
+  border: 0;
+  background: transparent;
+  color: var(--ash);
+  cursor: pointer;
+}
+
+.segmented button:hover {
+  color: var(--vellum);
+}
+
+/* 36 px plates with a 44 px target. */
+.segmented button::after {
+  content: '';
+  position: absolute;
+  inset: -4px -2px;
+}
+
+.segmented button[aria-pressed='true'],
+.segmented button[aria-checked='true'] {
+  background: linear-gradient(180deg, #ecd497, #cfad63 48%, #bf9c55 52%, #d6b871);
+  color: var(--ink);
+  text-shadow: 0 1px 0 rgb(255 240 205 / 0.45);
+  box-shadow: inset 0 0 0 1px rgb(60 40 10 / 0.55), inset 0 1px 0 1px rgb(255 246 215 / 0.4), 0 1px 3px rgb(0 0 0 / 0.6);
+}
+
+/* ---------------------------------------------------------------- drawers */
+
+.drawer-scrim {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(120% 100% at 30% 50%, rgb(6 5 9 / 0.45), rgb(4 3 6 / 0.7));
+  backdrop-filter: blur(2px);
+  z-index: 40;
+}
+
+/* A drawer is a heavy folio: dark calf over boards, a tooled gilt rule round it with flowers at the
+   corners, and the edge it opens from bound like a spine.
+   It starts under route A's screen light (App.svelte sets --screen-light on the room), which sits
+   above everything: its title, Close and tabs stay in view and take their own clicks, and the band
+   goes on lighting the wand while Wand tuning is open. The scrim may run under the band. */
+.drawer {
+  position: fixed;
+  top: var(--screen-light, 0px);
+  bottom: 0;
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100vw);
+  background:
+    radial-gradient(90% 60% at 20% 0%, rgb(255 214 150 / 0.05), transparent 70%),
+    var(--tex-leather) 0 0 / 200px,
+    linear-gradient(180deg, var(--folio-2), var(--folio) 40%, #15100e);
+  background-blend-mode: normal, soft-light, normal;
+  border-left: 0;
+  outline: 1px solid color-mix(in srgb, var(--gilt) 50%, transparent);
+  outline-offset: -9px;
+  box-shadow:
+    -24px 0 70px rgb(0 0 0 / 0.6),
+    inset 0 0 0 1px #0a0705,
+    inset 0 0 0 12px rgb(0 0 0 / 0.12);
+}
+
+/* The flowers at the rule's corners. */
+.drawer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    var(--tool-corner) 0 0 / 40px no-repeat,
+    var(--tool-corner) 100% 0 / 40px no-repeat,
+    var(--tool-corner) 0 100% / 40px no-repeat,
+    var(--tool-corner) 100% 100% / 40px no-repeat;
+}
+
+/* The bound edge: a raised band of leather with a row of stitches, along the side it opens from. */
+.drawer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(180deg, color-mix(in srgb, var(--gilt) 45%, transparent) 0 5px, transparent 5px 11px) 3px 0 / 1px 100% no-repeat,
+    linear-gradient(90deg, #0a0705, #2c221c 45%, #130e0b);
+}
+
+.drawer.right { right: 0; }
+.drawer.right::after { left: 0; }
+.drawer.left { left: 0; box-shadow: 24px 0 70px rgb(0 0 0 / 0.6), inset 0 0 0 1px #0a0705, inset 0 0 0 12px rgb(0 0 0 / 0.12); }
+.drawer.left::after { right: 0; }
+
+/* The title on the folio: lettered in gilt, with an ornamental rule under it. The flower at the
+   corner turns the rule, so the head is set in from it. */
+.drawer-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 24px 22px 28px;
+}
+
+/* Inside the head, so nothing in the body scrolls under it. */
+.drawer-head::after {
+  content: '';
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  bottom: 2px;
+  height: 14px;
+  background:
+    var(--rule-ornament) center / 120px 14px no-repeat,
+    linear-gradient(90deg, transparent, color-mix(in srgb, var(--gilt) 50%, transparent) 10%, color-mix(in srgb, var(--gilt) 50%, transparent) calc(50% - 60px), transparent calc(50% - 58px), transparent calc(50% + 58px), color-mix(in srgb, var(--gilt) 50%, transparent) calc(50% + 60px), color-mix(in srgb, var(--gilt) 50%, transparent) 90%, transparent) center / 100% 1px no-repeat;
+  pointer-events: none;
+}
+
+.drawer-head h2 {
+  margin: 0;
+  font-size: 28px;
+  color: var(--gilt-text);
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 0 rgb(0 0 0 / 0.8), 0 0 18px rgb(242 184 75 / 0.12);
+}
+
+/* The folio's title opens with an ornate gilt capital. */
+.drawer-head h2::first-letter {
+  font-family: var(--font-ornate);
+  font-weight: 700;
+  font-size: 1.1em;
+  color: var(--gilt-light);
+}
+
+.drawer-body {
+  flex: 1;
+  overflow: auto;
+  padding: 14px 24px 30px 28px;
+}
+
+/* ---------------------------------------------------------------- lists */
+
+.list-plain {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.row.space {
+  justify-content: space-between;
+}
+
+.stack {
+  display: grid;
+  gap: var(--gap);
+}
+
+/* A status word as a small label: inked on parchment, gilt-edged on dark grounds. */
+.tag {
+  display: inline-block;
+  padding: 0 9px;
+  border-radius: 3px;
+  corner-shape: bevel;
+  font-family: var(--font-label);
+  font-size: 17px;
+  letter-spacing: 0.05em;
+  border: 1px solid currentColor;
+  line-height: 1.4;
+}
+
+.tag-learned { color: var(--verdigris); }
+.tag-open { color: var(--candle); }
+.tag-locked { color: var(--ash); }
+.on-vellum .tag-learned,
+.page .tag-learned { color: #2f6f64; }
+.on-vellum .tag-open,
+.page .tag-open { color: #8a5a12; }
+.on-vellum .tag-locked,
+.page .tag-locked { color: color-mix(in srgb, var(--ink) 55%, var(--vellum)); }
+
+kbd {
+  font-family: var(--font-text);
+  font-size: 0.85em;
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--brass) 55%, transparent);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  background: rgb(0 0 0 / 0.25);
+}

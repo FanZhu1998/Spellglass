@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "themepack-1.json",
+  "title": "Spellglass theme pack, format themepack/1",
+  "description": "Everything a player sees or hears that is not a spell: color tokens, fonts, grade labels, sound captions and hidden-ink lines (blueprint Section 9.2; TypeScript shape in src/contracts/packs.ts ThemePack). Pack lint also checks the contrast pairs of Section 10.2. Unknown fields are allowed and kept.",
+  "type": "object",
+  "required": ["schema", "id", "version", "tokens", "fonts", "grades"],
+  "properties": {
+    "schema": { "type": "string", "const": "themepack/1" },
+    "id": { "$ref": "common-1.json#/definitions/id" },
+    "version": { "$ref": "common-1.json#/definitions/version" },
+    "title": { "$ref": "common-1.json#/definitions/shortText" },
+    "description": { "$ref": "common-1.json#/definitions/longText" },
+    "tokens": {
+      "description": "Color tokens by name: night, slate, vellum, ink, candle, oxblood, verdigris and ash in version 1.",
+      "type": "object",
+      "maxProperties": 64,
+      "propertyNames": { "$ref": "common-1.json#/definitions/token" },
+      "additionalProperties": { "$ref": "common-1.json#/definitions/color" }
+    },
+    "accents": {
+      "description": "Optional accent pairs that restyle Candle and Oxblood for house colors.",
+      "type": "object",
+      "maxProperties": 16,
+      "propertyNames": { "$ref": "common-1.json#/definitions/token" },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["label", "candle", "oxblood"],
+        "properties": {
+          "label": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "candle": { "$ref": "common-1.json#/definitions/color" },
+          "oxblood": { "$ref": "common-1.json#/definitions/color" }
+        }
+      }
+    },
+    "fonts": {
+      "type": "object",
+      "required": ["display", "text"],
+      "properties": {
+        "display": { "$ref": "common-1.json#/definitions/fontName" },
+        "text": { "$ref": "common-1.json#/definitions/fontName" }
+      }
+    },
+    "grades": {
+      "description": "Labels that turn quality (0 to 1) into a grade: the first entry whose min the quality reaches.",
+      "type": "object",
+      "required": ["cast", "fizzle"],
+      "properties": {
+        "cast": { "$ref": "#/definitions/grades" },
+        "fizzle": { "$ref": "#/definitions/grades" }
+      }
+    },
+    "captions": {
+      "description": "A caption for every sound cue, by cue name (Section 10.6).",
+      "type": "object",
+      "maxProperties": 128,
+      "propertyNames": { "$ref": "common-1.json#/definitions/token" },
+      "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 80 }
+    },
+    "hidden_ink": {
+      "description": "Lines of hidden ink that Revelio reveals.",
+      "type": "array",
+      "maxItems": 64,
+      "items": { "type": "string", "minLength": 1, "maxLength": 120 }
+    }
+  },
+  "definitions": {
+    "grades": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "required": ["min", "label"],
+        "properties": {
+          "min": { "$ref": "common-1.json#/definitions/fraction" },
+          "label": { "type": "string", "minLength": 1, "maxLength": 40 }
+        }
+      }
+    }
+  }
+}

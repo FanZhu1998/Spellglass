@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0F1424" />
+    <meta name="description" content="Trace a spell in the air with your wand and watch the mirror answer. An unofficial fan project." />
+    <!-- Section 11.2: connections only to the app's own origin. Pack sources a player adds are fetched
+         as files they drop in, so nothing else needs to be listed. wasm-unsafe-eval lets the optional
+         hand tracker compile its WebAssembly; blob: lets the stage record clips. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; font-src 'self' data:; connect-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'none'"
+    />
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <title>Spellglass</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <noscript>Spellglass needs JavaScript to watch your wand.</noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

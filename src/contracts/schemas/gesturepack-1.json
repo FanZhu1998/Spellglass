@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "gesturepack-1.json",
+  "title": "Spellglass gesture pack, format gesturepack/1",
+  "description": "A player's redrawn gestures, exported from the Workshop as one file (blueprint Section 11.1; TypeScript shape in src/contracts/packs.ts GesturePack). An imported gesture pack is a layer: the player's own drawings win, then enabled gesture packs (newest first), then the spell pack's gesture. Gestures are stored right-handed; the left-handed switch mirrors them when the spellbook is built. Unknown fields are allowed and kept.",
+  "type": "object",
+  "required": ["schema", "id", "version", "title", "gestures"],
+  "properties": {
+    "schema": { "type": "string", "const": "gesturepack/1" },
+    "id": { "$ref": "common-1.json#/definitions/id" },
+    "version": { "$ref": "common-1.json#/definitions/version" },
+    "title": { "$ref": "common-1.json#/definitions/shortText" },
+    "description": { "$ref": "common-1.json#/definitions/longText" },
+    "gestures": {
+      "description": "Gestures by spell id.",
+      "type": "object",
+      "maxProperties": 200,
+      "propertyNames": { "$ref": "common-1.json#/definitions/id" },
+      "additionalProperties": { "$ref": "common-1.json#/definitions/gesture" }
+    }
+  }
+}

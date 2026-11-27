@@ -1,0 +1,133 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "session-1.json",
+  "title": "Spellglass recorded session, format session/1",
+  "description": "A saved stream of tracker events plus the casts it should produce (blueprint Section 9.1 rule 8, Section 13 'Recorded sessions'; TypeScript shape in src/contracts/session.ts RecordedSession). The diagnostics overlay records sessions in this format and tests replay them. Event times are capture times in ms from the start of the session. Event types other than the four of version 1 are allowed and ignored by readers.",
+  "type": "object",
+  "required": ["schema", "id", "recordedAt", "tracker", "aspect", "events", "expected"],
+  "properties": {
+    "schema": { "type": "string", "const": "session/1" },
+    "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "title": { "type": "string", "maxLength": 200 },
+    "recordedAt": { "type": "string", "maxLength": 64 },
+    "tracker": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "aspect": {
+      "description": "Width divided by height of caster space.",
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 10
+    },
+    "pen": { "type": "boolean" },
+    "segmentation": {
+      "description": "Contract 1.2: what the recorded tracker's samples needed from the segmenter, its tracker.status segmentation (contracts/events.ts SegmentationNeeds) as the segmenter reads it. A replay publishes it again, so the samples are segmented as they were live. Absent: the tracker needed nothing.",
+      "type": "object",
+      "properties": {
+        "lostMs": { "type": "number", "minimum": 0, "maximum": 2000 },
+        "minSamples": { "type": "number", "minimum": 0, "maximum": 1000 },
+        "pauseMs": { "type": "number", "minimum": 0, "maximum": 2000 }
+      }
+    },
+    "settings": {
+      "description": "Settings that shaped the pipeline when recorded (only non-default ones). Applied only by test harnesses.",
+      "type": "object"
+    },
+    "enabledSpells": {
+      "type": "array",
+      "maxItems": 500,
+      "items": { "type": "string", "maxLength": 64 }
+    },
+    "intended": { "type": "string", "maxLength": 64 },
+    "camera": {
+      "type": "object",
+      "required": ["label", "width", "height", "fps"],
+      "properties": {
+        "label": { "type": "string", "maxLength": 200 },
+        "width": { "type": "number", "minimum": 0, "maximum": 100000 },
+        "height": { "type": "number", "minimum": 0, "maximum": 100000 },
+        "fps": { "type": "number", "minimum": 0, "maximum": 1000 },
+        "exposure": {
+          "type": "object",
+          "required": ["mode"],
+          "properties": {
+            "mode": { "type": "string", "maxLength": 32 },
+            "time": { "type": "number" }
+          }
+        }
+      }
+    },
+    "video": { "type": "string", "maxLength": 260 },
+    "events": {
+      "type": "array",
+      "maxItems": 1000000,
+      "items": { "$ref": "#/definitions/event" }
+    },
+    "expected": {
+      "type": "array",
+      "maxItems": 100000,
+      "items": { "$ref": "#/definitions/expectation" }
+    }
+  },
+  "definitions": {
+    "position": {
+      "description": "Caster space, 0 to 1 per axis; trackers may report points slightly outside.",
+      "type": "number",
+      "minimum": -1,
+      "maximum": 2
+    },
+    "event": {
+      "type": "object",
+      "required": ["type", "t"],
+      "properties": {
+        "type": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "t": { "type": "number" }
+      },
+      "allOf": [
+        { "if": { "properties": { "type": { "const": "tip.sample" } } }, "then": { "$ref": "#/definitions/tipEvent" } },
+        { "if": { "properties": { "type": { "const": "tip.found" } } }, "then": { "$ref": "#/definitions/tipEvent" } },
+        { "if": { "properties": { "type": { "const": "tip.lost" } } }, "then": { "$ref": "#/definitions/lostEvent" } },
+        { "if": { "properties": { "type": { "const": "voice.incantation" } } }, "then": { "$ref": "#/definitions/voiceEvent" } }
+      ]
+    },
+    "tipEvent": {
+      "type": "object",
+      "required": ["x", "y", "conf"],
+      "properties": {
+        "x": { "$ref": "#/definitions/position" },
+        "y": { "$ref": "#/definitions/position" },
+        "conf": { "$ref": "common-1.json#/definitions/fraction" },
+        "size": { "type": "number", "minimum": 0, "maximum": 1 },
+        "frame": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "lostEvent": {
+      "type": "object",
+      "properties": {
+        "lastSeen": { "type": "number" }
+      }
+    },
+    "voiceEvent": {
+      "type": "object",
+      "required": ["text", "conf", "final"],
+      "properties": {
+        "text": { "type": "string", "maxLength": 500 },
+        "spellId": { "type": "string", "maxLength": 64 },
+        "conf": { "$ref": "common-1.json#/definitions/fraction" },
+        "final": { "type": "boolean" },
+        "id": { "type": "string", "maxLength": 128 },
+        "t0": { "type": "number" },
+        "t1": { "type": "number" }
+      }
+    },
+    "expectation": {
+      "type": "object",
+      "required": ["spellId", "t"],
+      "properties": {
+        "spellId": { "type": ["string", "null"], "maxLength": 64 },
+        "t": { "type": "number" },
+        "intended": { "type": "string", "maxLength": 64 },
+        "decided": { "type": ["string", "null"], "maxLength": 64 },
+        "strokeId": { "type": "string", "maxLength": 128 }
+      }
+    }
+  }
+}

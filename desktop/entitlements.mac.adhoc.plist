@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Entitlements for the hardened runtime while the Mac app is signed ad hoc, with no Developer ID yet
+     (electron-builder.config.mjs, mac): entitlements.mac.plist plus disable-library-validation. An ad
+     hoc signature has no Team ID, so library validation would refuse Electron's own frameworks. A build
+     signed with a Developer ID uses entitlements.mac.plist, without it. -->
+<plist version="1.0">
+  <dict>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <key>com.apple.security.device.camera</key>
+    <true/>
+  </dict>
+</plist>

@@ -1,0 +1,683 @@
+{
+  "schema": "spellpack/1",
+  "id": "core-charms",
+  "version": "1.0.0",
+  "engine": ">=1.0 <2.0",
+  "title": "Core charms",
+  "description": "The twelve most-cast charms: light, levitation, summoning, shields and the duelling basics.",
+  "needs": [
+    "fx.light@1",
+    "fx.particles@1",
+    "fx.props@1",
+    "fx.shapes@1",
+    "fx.text@1",
+    "audio@1"
+  ],
+  "spells": [
+    {
+      "id": "lumos",
+      "incantation": "Lumos",
+      "known_as": "Wand-lighting charm",
+      "gesture_text": "Flick straight up.",
+      "description": "Your wand tip ignites; the room dims around it.",
+      "basis": "app",
+      "heard_as": [
+        "loomos",
+        "loo moss",
+        "luminous",
+        "lumens",
+        "lou moss",
+        "lumo"
+      ],
+      "gesture": {
+        "flick": "up"
+      },
+      "effect": {
+        "steps": [
+          {
+            "use": "light.orb",
+            "at": "tip",
+            "hold": true
+          },
+          {
+            "use": "scene.dim",
+            "amount": 0.35,
+            "hold": true
+          },
+          {
+            "use": "audio.cue",
+            "cue": "chime-rise"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "ended_by": [
+        "nox",
+        "finite-incantatem"
+      ],
+      "variants": [
+        {
+          "when": {
+            "power_min": 0.8
+          },
+          "label": "Lumos Maxima",
+          "effect_scale": 1.6
+        }
+      ],
+      "cooldown_ms": 400,
+      "tier": 1
+    },
+    {
+      "id": "nox",
+      "incantation": "Nox",
+      "known_as": "Puts the light out",
+      "gesture_text": "Flick straight down.",
+      "description": "The light snuffs; the room returns.",
+      "basis": "app",
+      "heard_as": [
+        "knocks",
+        "knox",
+        "nocks",
+        "noks",
+        "locks",
+        "nawks"
+      ],
+      "gesture": {
+        "flick": "down"
+      },
+      "needs_active": [
+        "lumos"
+      ],
+      "ends": [
+        "lumos"
+      ],
+      "effect": {
+        "steps": [
+          {
+            "use": "light.snuff",
+            "spell": "lumos",
+            "smoke": true
+          },
+          {
+            "use": "audio.cue",
+            "cue": "snuff"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "tier": 1
+    },
+    {
+      "id": "wingardium-leviosa",
+      "incantation": "Wingardium Leviosa",
+      "known_as": "Levitation charm",
+      "gesture_text": "Arc over from left to right, then drop straight down: \"swish and flick\".",
+      "description": "The feather lifts and follows your tip.",
+      "basis": "story",
+      "heard_as": [
+        "wing guardian leviosa",
+        "win guardian leviosa",
+        "wingardium levi osa",
+        "when guardian leviosa",
+        "wingardium leviosaa",
+        "wingardium"
+      ],
+      "gesture": {
+        "path": [[0.1, 0.55], [0.11, 0.48], [0.13, 0.41], [0.16, 0.34], [0.21, 0.28], [0.26, 0.23], [0.32, 0.19], [0.39, 0.16], [0.47, 0.15], [0.54, 0.15], [0.61, 0.17], [0.68, 0.19], [0.74, 0.23], [0.8, 0.28], [0.84, 0.34], [0.87, 0.41], [0.89, 0.48], [0.9, 0.55], [0.9, 0.63], [0.9, 0.7], [0.9, 0.78], [0.9, 0.85], [0.9, 0.93], [0.9, 1]],
+        "parts": [
+          {
+            "until": 0.736,
+            "name": "the swish"
+          },
+          {
+            "until": 1,
+            "name": "the flick",
+            "short_hint": "The flick stopped short: drop straight down after the swish."
+          }
+        ]
+      },
+      "targets": [
+        "prop.feather",
+        "prop.levitatable"
+      ],
+      "effect": {
+        "steps": [
+          {
+            "use": "prop.levitate",
+            "follow_tip": true,
+            "duration_ms": 8000
+          },
+          {
+            "use": "particles.burst",
+            "preset": "stars",
+            "at": "target",
+            "count": 24
+          },
+          {
+            "use": "audio.cue",
+            "cue": "swish-lift"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "duration_ms": 8000,
+      "ended_by": [
+        "finite-incantatem"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "alohomora",
+      "incantation": "Alohomora",
+      "known_as": "Unlocking charm",
+      "gesture_text": "Circle clockwise from the top, then straight down through it.",
+      "description": "The box unlatches and opens.",
+      "basis": "park",
+      "heard_as": [
+        "aloha mora",
+        "a low ha mora",
+        "alohamora",
+        "aloha more a",
+        "allo homora",
+        "aloe homora"
+      ],
+      "gesture": {
+        "path": [[0.5, 0.05], [0.62, 0.08], [0.72, 0.15], [0.78, 0.25], [0.8, 0.37], [0.76, 0.49], [0.69, 0.58], [0.58, 0.64], [0.46, 0.65], [0.34, 0.6], [0.25, 0.52], [0.21, 0.41], [0.21, 0.28], [0.26, 0.17], [0.35, 0.09], [0.46, 0.05], [0.5, 0.14], [0.5, 0.26], [0.5, 0.38], [0.5, 0.51], [0.5, 0.63], [0.5, 0.75], [0.5, 0.88], [0.5, 1]],
+        "any_start": false,
+        "parts": [
+          {
+            "until": 0.656,
+            "name": "the circle",
+            "short_hint": "The circle stopped short: close it at the top before the downstroke."
+          },
+          {
+            "until": 1,
+            "name": "the downstroke",
+            "short_hint": "The downstroke stopped short: carry it through the circle."
+          }
+        ]
+      },
+      "targets": [
+        "prop.lockable"
+      ],
+      "effect": {
+        "steps": [
+          {
+            "use": "prop.unlock"
+          },
+          {
+            "use": "particles.burst",
+            "preset": "sparks",
+            "at": "target",
+            "count": 20
+          },
+          {
+            "use": "audio.cue",
+            "cue": "latch"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "tier": 2
+    },
+    {
+      "id": "accio",
+      "incantation": "Accio",
+      "known_as": "Summoning charm",
+      "gesture_text": "A \"C\": from upper right, around the left, to lower right.",
+      "description": "The nearest object flies to your tip.",
+      "basis": "app",
+      "heard_as": [
+        "akio",
+        "aki oh",
+        "axio",
+        "ack see oh",
+        "ah key oh",
+        "acio"
+      ],
+      "gesture": {
+        "path": [[0.75, 0.14], [0.68, 0.1], [0.61, 0.09], [0.54, 0.08], [0.46, 0.09], [0.39, 0.11], [0.33, 0.15], [0.27, 0.2], [0.23, 0.26], [0.19, 0.32], [0.16, 0.39], [0.15, 0.46], [0.15, 0.54], [0.16, 0.61], [0.19, 0.68], [0.23, 0.74], [0.27, 0.8], [0.33, 0.85], [0.39, 0.89], [0.46, 0.91], [0.54, 0.92], [0.61, 0.91], [0.68, 0.9], [0.75, 0.86]],
+        "parts": [
+          {
+            "until": 1,
+            "name": "the curve",
+            "short_hint": "The curve stopped short: bring it round to the lower right."
+          }
+        ]
+      },
+      "targets": [
+        "prop.movable"
+      ],
+      "effect": {
+        "steps": [
+          {
+            "use": "prop.pull",
+            "hold_ms": 3000
+          },
+          {
+            "use": "particles.stream",
+            "preset": "stars",
+            "from": "target",
+            "to": "tip",
+            "duration_ms": 600
+          },
+          {
+            "use": "audio.cue",
+            "cue": "whoosh-in"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "tier": 2
+    },
+    {
+      "id": "expelliarmus",
+      "incantation": "Expelliarmus",
+      "known_as": "Disarming charm",
+      "gesture_text": "A check mark: a short stroke down and right, then a long flick up and right.",
+      "description": "A scarlet bolt; the dummy's wand spins away.",
+      "basis": "app",
+      "heard_as": [
+        "expelli armis",
+        "expelly armus",
+        "ex pelli armus",
+        "expelliarmis",
+        "expel the armies",
+        "expelliarmos"
+      ],
+      "gesture": {
+        "path": [[0.1, 0.55], [0.14, 0.6], [0.17, 0.65], [0.21, 0.7], [0.24, 0.75], [0.28, 0.8], [0.32, 0.85], [0.35, 0.9], [0.39, 0.85], [0.43, 0.8], [0.47, 0.75], [0.5, 0.7], [0.54, 0.65], [0.58, 0.6], [0.61, 0.55], [0.65, 0.5], [0.69, 0.45], [0.73, 0.4], [0.76, 0.35], [0.8, 0.3], [0.84, 0.25], [0.88, 0.2], [0.91, 0.15], [0.95, 0.1]],
+        "parts": [
+          {
+            "until": 0.301,
+            "name": "the short stroke"
+          },
+          {
+            "until": 1,
+            "name": "the long flick",
+            "short_hint": "The long flick stopped short: carry it up and right, past where you began."
+          }
+        ]
+      },
+      "targets": [
+        "prop.dummy"
+      ],
+      "effect": {
+        "steps": [
+          {
+            "use": "bolt.cast",
+            "from": "tip",
+            "to": "target",
+            "color": "#E0313F"
+          },
+          {
+            "use": "light.flash",
+            "at": "target",
+            "color": "#E0313F",
+            "intensity": 0.5,
+            "radius": 0.2,
+            "delay_ms": 180
+          },
+          {
+            "use": "prop.disarm",
+            "delay_ms": 180
+          },
+          {
+            "use": "audio.cue",
+            "cue": "bolt"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "cooldown_ms": 400,
+      "tier": 2
+    },
+    {
+      "id": "stupefy",
+      "incantation": "Stupefy",
+      "known_as": "Stunning spell",
+      "gesture_text": "Flick left to right.",
+      "description": "A red flash; the dummy reels.",
+      "basis": "app",
+      "heard_as": [
+        "stupify",
+        "stupid fly",
+        "stew pa fly",
+        "stupe fly",
+        "stupefied",
+        "stoop a fly"
+      ],
+      "gesture": {
+        "flick": "right"
+      },
+      "targets": [
+        "prop.dummy"
+      ],
+      "effect": {
+        "steps": [
+          {
+            "use": "bolt.cast",
+            "from": "tip",
+            "to": "target",
+            "color": "#FF4436",
+            "width": 0.6
+          },
+          {
+            "use": "light.flash",
+            "at": "target",
+            "color": "#FF3B30",
+            "intensity": 0.55,
+            "radius": 0.22,
+            "delay_ms": 160
+          },
+          {
+            "use": "prop.reel",
+            "intensity": 0.8,
+            "delay_ms": 160
+          },
+          {
+            "use": "audio.cue",
+            "cue": "stun"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "cooldown_ms": 400,
+      "tier": 1
+    },
+    {
+      "id": "protego",
+      "incantation": "Protego",
+      "known_as": "Shield charm",
+      "gesture_text": "A circle, clockwise, from any point.",
+      "description": "A rippling dome holds for five seconds.",
+      "basis": "app",
+      "heard_as": [
+        "pro tego",
+        "protect go",
+        "protago",
+        "pro tay go",
+        "pertego",
+        "protego"
+      ],
+      "gesture": {
+        "path": [[0.5, 0.05], [0.62, 0.07], [0.73, 0.12], [0.83, 0.19], [0.9, 0.29], [0.94, 0.41], [0.95, 0.53], [0.92, 0.65], [0.87, 0.76], [0.78, 0.85], [0.68, 0.91], [0.56, 0.95], [0.44, 0.95], [0.32, 0.91], [0.22, 0.85], [0.13, 0.76], [0.08, 0.65], [0.05, 0.53], [0.06, 0.41], [0.1, 0.29], [0.17, 0.19], [0.27, 0.12], [0.38, 0.07], [0.5, 0.05]],
+        "any_start": true,
+        "start_points": 12,
+        "parts": [
+          {
+            "until": 1,
+            "name": "the circle",
+            "short_hint": "The circle stopped short: close it where you began."
+          }
+        ]
+      },
+      "effect": {
+        "steps": [
+          {
+            "use": "shield.dome",
+            "duration_ms": 5000
+          },
+          {
+            "use": "audio.cue",
+            "cue": "shield"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "duration_ms": 5000,
+      "ended_by": [
+        "finite-incantatem"
+      ],
+      "tier": 2
+    },
+    {
+      "id": "expecto-patronum",
+      "incantation": "Expecto Patronum",
+      "known_as": "Patronus charm",
+      "gesture_text": "Spiral outward from the centre, two turns clockwise.",
+      "description": "A silver creature bursts out and circles the frame.",
+      "basis": "app",
+      "heard_as": [
+        "expecto patronus",
+        "expect o patronum",
+        "expecto patron um",
+        "expecting patronum",
+        "expect a patronum",
+        "expecto petronum"
+      ],
+      "gesture": {
+        "path": [[0.5, 0.45], [0.61, 0.51], [0.55, 0.64], [0.41, 0.65], [0.3, 0.55], [0.29, 0.41], [0.37, 0.29], [0.51, 0.23], [0.65, 0.26], [0.76, 0.35], [0.82, 0.49], [0.81, 0.63], [0.73, 0.76], [0.62, 0.84], [0.47, 0.87], [0.33, 0.85], [0.21, 0.77], [0.12, 0.66], [0.08, 0.52], [0.08, 0.37], [0.14, 0.24], [0.23, 0.13], [0.36, 0.05], [0.5, 0.02]],
+        "parts": [
+          {
+            "until": 0.3,
+            "name": "the first turn"
+          },
+          {
+            "until": 1,
+            "name": "the outer turn",
+            "short_hint": "The outer turn stopped short: keep spiralling outward for a second full turn."
+          }
+        ]
+      },
+      "effect": {
+        "steps": [
+          {
+            "use": "creature.summon",
+            "kind": "hare",
+            "duration_ms": 7000
+          },
+          {
+            "use": "light.flash",
+            "at": "tip",
+            "color": "#DDE8FF",
+            "intensity": 0.45,
+            "radius": 0.25
+          },
+          {
+            "use": "particles.burst",
+            "preset": "stars",
+            "at": "tip",
+            "count": 60
+          },
+          {
+            "use": "audio.cue",
+            "cue": "patronus"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "duration_ms": 7000,
+      "ended_by": [
+        "finite-incantatem"
+      ],
+      "tier": 3
+    },
+    {
+      "id": "reparo",
+      "incantation": "Reparo",
+      "known_as": "Mending charm",
+      "gesture_text": "A figure-eight on its side, starting at the centre.",
+      "description": "The cracked teacup knits together.",
+      "basis": "app",
+      "heard_as": [
+        "repair oh",
+        "repaero",
+        "re par oh",
+        "rapparo",
+        "reparrow",
+        "repairo"
+      ],
+      "gesture": {
+        "path": [[0.5, 0.5], [0.59, 0.59], [0.68, 0.68], [0.78, 0.74], [0.9, 0.71], [0.94, 0.59], [0.95, 0.47], [0.93, 0.35], [0.85, 0.25], [0.73, 0.28], [0.63, 0.36], [0.54, 0.45], [0.46, 0.55], [0.37, 0.64], [0.27, 0.72], [0.15, 0.75], [0.07, 0.65], [0.05, 0.53], [0.06, 0.41], [0.1, 0.29], [0.22, 0.26], [0.32, 0.32], [0.41, 0.41], [0.5, 0.5]],
+        "parts": [
+          {
+            "until": 0.478,
+            "name": "the right loop"
+          },
+          {
+            "until": 1,
+            "name": "the left loop",
+            "short_hint": "The left loop stopped short: come back through the centre."
+          }
+        ]
+      },
+      "targets": [
+        "prop.mendable"
+      ],
+      "effect": {
+        "steps": [
+          {
+            "use": "prop.mend"
+          },
+          {
+            "use": "particles.burst",
+            "preset": "stars",
+            "at": "target",
+            "count": 30
+          },
+          {
+            "use": "audio.cue",
+            "cue": "mend"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "tier": 3
+    },
+    {
+      "id": "incendio",
+      "incantation": "Incendio",
+      "known_as": "Fire-making spell",
+      "gesture_text": "A triangle from the lower right: up to the point, down, then back along the base.",
+      "description": "The candle catches and embers fly.",
+      "basis": "park",
+      "heard_as": [
+        "in send io",
+        "insendio",
+        "in sendy oh",
+        "incendia",
+        "in cendio",
+        "incendo"
+      ],
+      "gesture": {
+        "path": [[0.9, 0.9], [0.85, 0.8], [0.8, 0.7], [0.75, 0.6], [0.7, 0.5], [0.65, 0.4], [0.6, 0.3], [0.55, 0.2], [0.5, 0.11], [0.45, 0.21], [0.4, 0.31], [0.35, 0.41], [0.3, 0.51], [0.25, 0.61], [0.2, 0.71], [0.14, 0.81], [0.11, 0.9], [0.22, 0.9], [0.34, 0.9], [0.45, 0.9], [0.56, 0.9], [0.67, 0.9], [0.79, 0.9], [0.9, 0.9]],
+        "parts": [
+          {
+            "until": 0.346,
+            "name": "the climb"
+          },
+          {
+            "until": 0.691,
+            "name": "the descent",
+            "short_hint": "The descent stopped short: come all the way down before the base."
+          },
+          {
+            "until": 1,
+            "name": "the base",
+            "short_hint": "The base stopped short: carry it back to where you began."
+          }
+        ]
+      },
+      "targets": [
+        "prop.flammable",
+        "prop.burning"
+      ],
+      "effect": {
+        "steps": [
+          {
+            "use": "prop.ignite",
+            "hold": true
+          },
+          {
+            "use": "particles.burst",
+            "preset": "embers",
+            "at": "target",
+            "count": 40
+          },
+          {
+            "use": "light.flash",
+            "at": "target",
+            "color": "#FF8A2A",
+            "intensity": 0.45,
+            "radius": 0.2
+          },
+          {
+            "use": "audio.cue",
+            "cue": "fire"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "ended_by": [
+        "aguamenti",
+        "finite-incantatem"
+      ],
+      "tier": 3
+    },
+    {
+      "id": "aguamenti",
+      "incantation": "Aguamenti",
+      "known_as": "Water-making spell",
+      "gesture_text": "One wave from left to right: up, down, up.",
+      "description": "A water arc from the tip; flames go out.",
+      "basis": "list",
+      "heard_as": [
+        "agua menti",
+        "aqua menti",
+        "aguamente",
+        "agua mentee",
+        "aqua mentee",
+        "aguamenty"
+      ],
+      "gesture": {
+        "path": [[0.05, 0.5], [0.08, 0.44], [0.11, 0.38], [0.14, 0.32], [0.18, 0.26], [0.23, 0.22], [0.29, 0.2], [0.35, 0.24], [0.39, 0.29], [0.42, 0.35], [0.46, 0.41], [0.49, 0.47], [0.51, 0.53], [0.54, 0.59], [0.58, 0.65], [0.61, 0.71], [0.65, 0.76], [0.71, 0.8], [0.77, 0.78], [0.82, 0.74], [0.86, 0.68], [0.89, 0.62], [0.92, 0.56], [0.95, 0.5]],
+        "parts": [
+          {
+            "until": 0.259,
+            "name": "the first rise"
+          },
+          {
+            "until": 0.741,
+            "name": "the dip"
+          },
+          {
+            "until": 1,
+            "name": "the last rise",
+            "short_hint": "The last rise stopped short: finish the wave level with the start."
+          }
+        ]
+      },
+      "targets": [
+        "prop.burning",
+        "prop.any"
+      ],
+      "ends": [
+        "incendio"
+      ],
+      "effect": {
+        "steps": [
+          {
+            "use": "particles.stream",
+            "preset": "water",
+            "from": "tip",
+            "to": "target",
+            "duration_ms": 1500,
+            "arc": 0.35
+          },
+          {
+            "use": "prop.douse",
+            "all": true,
+            "delay_ms": 500
+          },
+          {
+            "use": "audio.cue",
+            "cue": "water"
+          }
+        ],
+        "fallback": "sparkle"
+      },
+      "tier": 3
+    }
+  ]
+}

@@ -65,7 +65,7 @@ function buildWeb() {
     return;
   }
   if (!existsSync(join(ROOT, 'public', 'models', 'hand_landmarker.task'))) {
-    console.warn('desktop: the hand model is not in public/models, so "My hand or finger" will not work in this build. Run npm run models first.');
+    console.warn('desktop: the hand model is not in public/models, so "The tip of my wand" and "My hand or finger" will not work in this build. Run npm run models first.');
   }
   npmRun('build', { BASE_PATH: '/' });
 }

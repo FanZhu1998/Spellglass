@@ -13,7 +13,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "vite",
+    "dev": "npm run gen && vite",
     "build": "npm run gen && vite build",
     "preview": "vite preview",
     "gen": "node tools/gen-validators.mjs",

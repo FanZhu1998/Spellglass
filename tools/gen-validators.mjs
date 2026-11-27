@@ -4,7 +4,8 @@
 // content security policy forbids eval and new Function (index.html: script-src 'self'), so Ajv may
 // not compile schemas in the browser. Ajv's standalone mode compiles them here, at build time, into a
 // plain ES module: src/kernel/packs/generated/validators.js, with a small validators.d.ts beside it.
-// 'npm run gen' runs this before 'npm run build' and 'npm test'. The folder is git-ignored.
+// 'npm run gen' runs this before 'npm run dev', 'npm run build' and 'npm test'. The folder is
+// git-ignored, so a fresh clone has none until one of them has run.
 //
 // Usage:
 //   node tools/gen-validators.mjs           write the validators (only files whose content changed)
